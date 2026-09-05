@@ -18,5 +18,4 @@ wheels/
 # OpenCode config
 .opencode/
 
-# API keys (по умолчанию игнорируем, если сэр не скажет иначе)
-keys.txt
+
