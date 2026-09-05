@@ -1,0 +1,19 @@
+version = 1
+revision = 3
+requires-python = ">=3.13"
+
+[manifest]
+members = [
+    "opencode-compat-proxy",
+    "test-revers-proxy",
+]
+
+[[package]]
+name = "opencode-compat-proxy"
+version = "0.1.0"
+source = { editable = "opencode_compat_proxy" }
+
+[[package]]
+name = "test-revers-proxy"
+version = "0.1.0"
+source = { editable = "." }

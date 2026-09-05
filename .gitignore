@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Python version
+.python-version
+
+# Type checking
+.mypy_cache/
+
+# OpenCode config
+.opencode/
+
+# API keys (по умолчанию игнорируем, если сэр не скажет иначе)
+keys.txt

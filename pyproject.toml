@@ -1,0 +1,22 @@
+[project]
+name = "test-revers-proxy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "kasiro", email = "kon.konikov@mail.ru" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+test-revers-proxy = "test_revers_proxy:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.workspace]
+members = [
+    "opencode_compat_proxy",
+]
