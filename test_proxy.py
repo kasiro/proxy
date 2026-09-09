@@ -17,6 +17,22 @@ app = FastAPI()
 
 current_acc_index = 0  # индекс текущего аккаунта в списке ACCOUNTS
 
+# Список моделей для эндпоинта /v1/models
+MODELS_LIST = [
+    {"id": "free-gemini-3.1-pro-preview", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-gemini-3.1-flash-lite", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-minimax-m2.7", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-gemini-2.5-pro", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-claude-haiku-4-5-20251001", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-gemini-2.5-flash", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-gpt-5.4-mini", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-qwen3.5-plus", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-qwen3.5-flash", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-minimax-m2.5", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-gemini-2.5-flash-lite", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "free-gemini-3-flash-preview", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+]
+
 def curl_to_python(curl_text: str):
     # Убираем обратные слэши и лишние пробелы
     curl_text = re.sub(r'\\\s*\n', ' ', curl_text).strip()
@@ -92,6 +108,12 @@ def safe_print_payload(payload: dict) -> None:
         ]
     
     print(json.dumps(safe_copy, indent=2, ensure_ascii=False))
+
+
+@app.get("/v1/models")
+async def models_list():
+    """Вернуть список моделей в формате OpenAI."""
+    return {"object": "list", "data": MODELS_LIST}
 
 def strip_think_from_sse_line(line: str) -> str:
     """Парсит SSE data строку и удаляет <think> теги из content delta."""
@@ -247,7 +269,7 @@ async def proxy(request: Request):
         payload['tools'] = tools
 
     # Построить system prompt с инструментами
-    if tools:
+    if tools and payload["model"] != 'free-qwen3.5-plus':
         system_prompt = build_system_prompt(tools, client_data)
     else:
         system_prompt = 'Ты — AI-ассистент. Отвечай на русском языке.'

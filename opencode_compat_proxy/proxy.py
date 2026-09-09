@@ -831,12 +831,7 @@ async def proxy(request: Request):
         return Response(content=upstream_resp.content, status_code=upstream_resp.status_code, headers=dict(upstream_resp.headers))
 
 
-@app.get("/v1/models")
-async def models_list():
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(UPSTREAM + "/v1/models", timeout=None)
-    log.info("MODELS: %d models returned", len(resp.json().get("data", [])))
-    return JSONResponse(content=resp.json(), status_code=resp.status_code)
+
 
 
 
