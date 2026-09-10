@@ -19,8 +19,6 @@ current_acc_index = 0  # индекс текущего аккаунта в сп�
 
 # Список моделей для эндпоинта /v1/models
 MODELS_LIST = [
-    {"id": "free-gemini-3.1-pro-preview", "object": "model", "created": 1788893105, "owned_by": "opencode"},
-    {"id": "free-gemini-3.1-flash-lite", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-minimax-m2.7", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-gemini-2.5-pro", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-claude-haiku-4-5-20251001", "object": "model", "created": 1788893105, "owned_by": "opencode"},
@@ -142,6 +140,8 @@ TARGET_URL = all_['url']
 session = rq.Session()
 session.headers.update(all_['headers'])
 session.cookies.update(all_['cookies'])
+session.trust_env = False  # Игнорировать HTTP_PROXY/HTTPS_PROXY и системные настройки
+session.proxies.clear()  # Явно очистить любые прокси
 
 
 def switch_account():
