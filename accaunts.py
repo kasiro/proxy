@@ -225,4 +225,68 @@ curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
   -H 'x-starry-window-id: f135f574-2da9-41b5-816f-65c2c520ebb6' \
   --data-raw '{"group":"default","messages":[{"content":"Привет?","role":"user"}],"model":"free-minimax-m2.7","stream":true}'
 """,
+"""
+curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
+  -H 'accept: text/event-stream' \
+  -H 'accept-language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7' \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/json' \
+  -b 'odirouter_attribution=eyJjYXB0dXJlZF9hdCI6MTc4NzU5NTkyNiwiZXhwaXJlc19hdCI6MTc5MDE4NzkyNiwibGFuZGluZ19wYXRoIjoiL29wZW5yb3V0ZXIiLCJwcm9wZXJ0aWVzIjp7InV0bV9zb3VyY2UiOiJ5YSIsImFkIjoiUlVZRFhPREZDMDI0In0sInJ1bGVfaWQiOjQ4LCJyb3V0ZV9uYW1lIjoib3BlbnJvdXRlciJ9; session=MTc4OTQ4MDE1MXxEWDhFQVFMX2dBQUJFQUVRQUFEX25mLUFBQVVHYzNSeWFXNW5EQVFBQW1sa0EybHVkQVFFQVA1RW5nWnpkSEpwYm1jTUNnQUlkWE5sY201aGJXVUdjM1J5YVc1bkRCUUFFblZmTmpaaE1qUTRNelUwTUdWbFpERXhOUVp6ZEhKcGJtY01CZ0FFY205c1pRTnBiblFFQWdBQ0JuTjBjbWx1Wnd3SUFBWnpkR0YwZFhNRGFXNTBCQUlBQWdaemRISnBibWNNQndBRlozSnZkWEFHYzNSeWFXNW5EQWtBQjJSbFptRjFiSFE9fJnMq7WduxmzSzXBiv9GPVQS2Ad47kKXlw_u7KYIVMxw; OdiRouter-authenticated=1' \
+  -H 'new-api-user: 8783' \
+  -H 'origin: https://odirouter.ai' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://odirouter.ai/dashboard/playground' \
+  -H 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Linux"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-gpc: 1' \
+  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' \
+  -H 'x-odirouter-attribution: eyJjYXB0dXJlZF9hdCI6MTc4NzU5NTkyNiwiZXhwaXJlc19hdCI6MTc5MDE4NzkyNiwibGFuZGluZ19wYXRoIjoiL29wZW5yb3V0ZXIiLCJwcm9wZXJ0aWVzIjp7InV0bV9zb3VyY2UiOiJ5YSIsImFkIjoiUlVZRFhPREZDMDI0In0sInJ1bGVfaWQiOjQ4LCJyb3V0ZV9uYW1lIjoib3BlbnJvdXRlciJ9' \
+  -H 'x-starry-current-page-id: playground_page' \
+  -H 'x-starry-current-page-name: playground_page' \
+  -H 'x-starry-current-page-url: https://odirouter.ai/dashboard/playground' \
+  -H 'x-starry-distinct-id: 8da9eb87-50f7-4718-b05d-f1cdd47d8556' \
+  -H 'x-starry-ref-page-id: model_page' \
+  -H 'x-starry-ref-page-name: model_page' \
+  -H 'x-starry-ref-page-url: https://odirouter.ai/dashboard/models' \
+  -H 'x-starry-session-id: 7db7229b-5b62-4fc1-a543-47674e99011c' \
+  -H 'x-starry-window-id: f42e41c7-63b9-4da0-9640-7020acd89e2e' \
+  --data-raw '{"group":"default","messages":[{"content":"привет?","role":"user"}],"model":"free-minimax-m2.7","stream":true}'
+""",
+"""
+curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
+  -H 'accept: text/event-stream' \
+  -H 'accept-language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7' \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/json' \
+  -b 'odirouter_attribution=eyJjYXB0dXJlZF9hdCI6MTc4NzU5NTkyNiwiZXhwaXJlc19hdCI6MTc5MDE4NzkyNiwibGFuZGluZ19wYXRoIjoiL29wZW5yb3V0ZXIiLCJwcm9wZXJ0aWVzIjp7InV0bV9zb3VyY2UiOiJ5YSIsImFkIjoiUlVZRFhPREZDMDI0In0sInJ1bGVfaWQiOjQ4LCJyb3V0ZV9uYW1lIjoib3BlbnJvdXRlciJ9; session=MTc4OTQ4MDM3MnxEWDhFQVFMX2dBQUJFQUVRQUFEX25mLUFBQVVHYzNSeWFXNW5EQVFBQW1sa0EybHVkQVFFQVA1RW9nWnpkSEpwYm1jTUNnQUlkWE5sY201aGJXVUdjM1J5YVc1bkRCUUFFblZmTURkaFpqTXdOVE5tTkdSaFlqWTFZZ1p6ZEhKcGJtY01CZ0FFY205c1pRTnBiblFFQWdBQ0JuTjBjbWx1Wnd3SUFBWnpkR0YwZFhNRGFXNTBCQUlBQWdaemRISnBibWNNQndBRlozSnZkWEFHYzNSeWFXNW5EQWtBQjJSbFptRjFiSFE9fIGO_fhjf8AEShVW2RWgPcbCUKqszvlMXsp3wAe9TgZU; OdiRouter-authenticated=1' \
+  -H 'new-api-user: 8785' \
+  -H 'origin: https://odirouter.ai' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://odirouter.ai/dashboard/playground' \
+  -H 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Linux"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-gpc: 1' \
+  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' \
+  -H 'x-odirouter-attribution: eyJjYXB0dXJlZF9hdCI6MTc4NzU5NTkyNiwiZXhwaXJlc19hdCI6MTc5MDE4NzkyNiwibGFuZGluZ19wYXRoIjoiL29wZW5yb3V0ZXIiLCJwcm9wZXJ0aWVzIjp7InV0bV9zb3VyY2UiOiJ5YSIsImFkIjoiUlVZRFhPREZDMDI0In0sInJ1bGVfaWQiOjQ4LCJyb3V0ZV9uYW1lIjoib3BlbnJvdXRlciJ9' \
+  -H 'x-starry-current-page-id: playground_page' \
+  -H 'x-starry-current-page-name: playground_page' \
+  -H 'x-starry-current-page-url: https://odirouter.ai/dashboard/playground' \
+  -H 'x-starry-distinct-id: 8da9eb87-50f7-4718-b05d-f1cdd47d8556' \
+  -H 'x-starry-ref-page-id: home_page' \
+  -H 'x-starry-ref-page-name: home_page' \
+  -H 'x-starry-ref-page-url: https://odirouter.ai/dashboard/home' \
+  -H 'x-starry-session-id: 7db7229b-5b62-4fc1-a543-47674e99011c' \
+  -H 'x-starry-window-id: f42e41c7-63b9-4da0-9640-7020acd89e2e' \
+  --data-raw '{"group":"default","messages":[{"content":"привет?","role":"user"}],"model":"free-minimax-m2.7","stream":true}'
+""",
 ]

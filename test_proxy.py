@@ -1,6 +1,7 @@
 from sys import exit
 import re
 import json
+import os
 from urllib.parse import urlparse
 from sseclient import SSEClient # type: ignore
 from pprint import pprint
@@ -10,6 +11,18 @@ from fastapi.responses import StreamingResponse # type: ignore
 import threading
 import asyncio
 from accaunts import ACCOUNTS
+from utils import curl_to_python, extract_account_ids_from_accounts
+
+# Debug mode: включать логи запросов на консоль
+DEBUG_MODE = os.environ.get("PROXY_DEBUG", "0") == "1"
+
+# Импорт клиента статистики
+try:
+    from stats_client import record_request_async, init_db, init_accounts
+    STATS_ENABLED = True
+except ImportError:
+    STATS_ENABLED = False
+    print("[stats] Модуль stats_client не найден, статистика отключена")
 
 # добавить tools, mcp, skills
 
@@ -23,7 +36,7 @@ MODELS_LIST = [
     {"id": "free-gemini-2.5-pro", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-claude-haiku-4-5-20251001", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-gemini-2.5-flash", "object": "model", "created": 1788893105, "owned_by": "opencode"},
-    {"id": "free-gpt-5.4-mini", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    # {"id": "free-gpt-5.4-mini", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-qwen3.5-plus", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-qwen3.5-flash", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "free-minimax-m2.5", "object": "model", "created": 1788893105, "owned_by": "opencode"},
@@ -31,58 +44,7 @@ MODELS_LIST = [
     {"id": "free-gemini-3-flash-preview", "object": "model", "created": 1788893105, "owned_by": "opencode"},
 ]
 
-def curl_to_python(curl_text: str):
-    # Убираем обратные слэши и лишние пробелы
-    curl_text = re.sub(r'\\\s*\n', ' ', curl_text).strip()
-    
-    # Извлекаем URL
-    url_match = re.search(r"curl\s+(?:--url\s+)?'([^']+)'", curl_text)
-    if not url_match:
-        url_match = re.search(r'curl\s+(?:--url\s+)"([^"]+)"', curl_text)
-    url = url_match.group(1) if url_match else None
 
-    # Извлекаем все -H заголовки (включая значения с кавычками)
-    headers = {}
-    for match in re.finditer(r"-H\s+'([^:]+):\s*([^']+)'", curl_text):
-        key, value = match.group(1).strip(), match.group(2).strip()
-        headers[key] = value
-    for match in re.finditer(r'-H\s+"([^:]+):\s*([^"]+)"', curl_text):
-        key, value = match.group(1).strip(), match.group(2).strip()
-        headers[key] = value
-
-    # Извлекаем куки (-b)
-    cookies = {}
-    cookie_match = re.search(r"-b\s+'([^']+)'", curl_text) or re.search(r'-b\s+"([^"]+)"', curl_text)
-    if cookie_match:
-        cookie_str = cookie_match.group(1)
-        # Можно разобрать как строку cookie (key=value; key2=value2)
-        for part in cookie_str.split(';'):
-            if '=' in part:
-                k, v = part.strip().split('=', 1)
-                cookies[k] = v
-
-    # Извлекаем данные --data-raw
-    data = None
-    data_match = re.search(r"--data-raw\s+'([^']+)'", curl_text) or re.search(r'--data-raw\s+"([^"]+)"', curl_text)
-    if data_match:
-        raw = data_match.group(1)
-        try:
-            data = json.loads(raw)   # если JSON
-        except:
-            data = raw               # если просто строка
-
-    # Метод (по умолчанию GET, но если есть --data – POST)
-    method = 'POST' if data else 'GET'
-    if re.search(r'-X\s+(\w+)', curl_text):
-        method = re.search(r'-X\s+(\w+)', curl_text).group(1) # type: ignore
-
-    return {
-        'url': url,
-        'method': method,
-        'headers': headers,
-        'cookies': cookies,
-        'data': data,
-    }
 def strip_think_tags(text: str) -> str:
     """Удаляет блоки <think>...</think>
 
@@ -135,6 +97,14 @@ def strip_think_from_sse_line(line: str) -> str:
     return line
 
 
+# Извлечение account_id из всех аккаунтов при старте
+ACCOUNT_IDS = extract_account_ids_from_accounts(ACCOUNTS)
+
+def get_current_account_id() -> str:
+    """Получить ID текущего аккаунта из предзагруженного списка."""
+    return ACCOUNT_IDS[current_acc_index]
+
+
 all_ = curl_to_python(ACCOUNTS[current_acc_index])
 TARGET_URL = all_['url']
 session = rq.Session()
@@ -142,6 +112,13 @@ session.headers.update(all_['headers'])
 session.cookies.update(all_['cookies'])
 session.trust_env = False  # Игнорировать HTTP_PROXY/HTTPS_PROXY и системные настройки
 session.proxies.clear()  # Явно очистить любые прокси
+
+# Инициализация БД статистики при старте
+if STATS_ENABLED:
+    init_db()  # type: ignore
+    # Инициализируем БД реальными аккаунтами (добавит отсутствующие с request_count=0)
+    init_accounts(ACCOUNT_IDS)  # type: ignore
+    print(f"[stats] БД статистики инициализирована: {len(ACCOUNT_IDS)} аккаунтов")
 
 
 def switch_account():
@@ -153,7 +130,8 @@ def switch_account():
     session.cookies.clear()
     session.headers.update(parsed['headers'])
     session.cookies.update(parsed['cookies'])
-    print(f"[retry] Переключён на аккаунт {current_acc_index + 1}/{len(ACCOUNTS)}")
+    # [retry] логи — всегда на консоль
+    print(f"[retry] Переключён на аккаунт {current_acc_index + 1}/{len(ACCOUNTS)}", flush=True)
 
 
 def format_tools_for_prompt(tools: list) -> str:
@@ -280,27 +258,51 @@ async def proxy(request: Request):
     else:
         payload['messages'].insert(0, {'role': 'system', 'content': system_prompt})
 
-    safe_print_payload(payload)
+    if DEBUG_MODE:
+        safe_print_payload(payload)
+        print(f"[proxy] Request to {TARGET_URL}", flush=True)
 
     # --- Retry при 429: перебираем ВСЕ аккаунты по кругу ---
     resp = None
+    # Извлекаем модель и токены (до цикла retry)
+    model = client_data.get("model", "unknown")
+    input_tokens = sum(len(msg.get("content", "")) for msg in client_data.get("messages", []))
+    output_tokens = 0  # Будет посчитано из ответа
+    account_id = get_current_account_id()
+    
     for attempt in range(len(ACCOUNTS)):
         resp = session.post(TARGET_URL, json=payload, stream=True)
+        
         if resp.status_code == 429:
             print(f"[retry] Аккаунт {current_acc_index + 1} вернул 429 (попытка {attempt + 1}/{len(ACCOUNTS)})")
+            if DEBUG_MODE:
+                print(f"[proxy] Response: 429 (аккаунт {current_acc_index + 1})", flush=True)
+            # Запись 429 в статистику
+            if STATS_ENABLED:
+                await record_request_async(account_id, 429, model, input_tokens, output_tokens)  # type: ignore
+            
             if attempt < len(ACCOUNTS) - 1:
                 switch_account()
                 continue
             else:
                 print("[retry] Все аккаунты исчерпаны, возвращаем 429 клиенту")
+                if DEBUG_MODE:
+                    print(f"[proxy] Response: 429 (все аккаунты исчерпаны)", flush=True)
                 return Response(
                     content=json.dumps({"error": "rate_limit_exceeded", "detail": "Все аккаунты вернули 429"}),
                     status_code=429
                 )
         if resp.status_code == 200:
+            if DEBUG_MODE:
+                print(f"[proxy] Response: 200 OK (аккаунт {current_acc_index + 1})", flush=True)
             break  # Нормальный ответ — выходим из цикла
 
         if resp.status_code not in [200, 429]:
+            # Запись других ошибок
+            if STATS_ENABLED:
+                await record_request_async(account_id, resp.status_code, model, input_tokens, output_tokens)  # type: ignore
+            if DEBUG_MODE:
+                print(f"[proxy] Response: {resp.status_code} (аккаунт {current_acc_index + 1})", flush=True)
             return Response(
                 content=resp.content,
                 status_code=resp.status_code
@@ -324,18 +326,37 @@ async def proxy(request: Request):
         # Запускаем задачу проверки
         asyncio.create_task(check_disconnect())
 
+        # Контейнер для сбора токенов из SSE
+        usage_data = {'input_tokens': input_tokens, 'output_tokens': 0}
+
         def stream_generator():
             for line in resp.iter_lines(decode_unicode=False): # type: ignore
                 if line:
-                    # Если пришёл признак конца потока – выходим
                     line = line.decode()
                     if line.strip() == 'data: [DONE]':
                         yield line + '\n\n' # type: ignore
                         break
-                    # Фильтрация <think> тегов из content delta
+                    # Извлечение usage из SSE
                     if line.startswith('data: '):
+                        # Фильтрация <think> тегов
                         line = strip_think_from_sse_line(line)
+                        # Парсинг usage
+                        try:
+                            payload_str = line[6:]  # убираем 'data: '
+                            if payload_str.strip() != '[DONE]':
+                                data = json.loads(payload_str)
+                                usage = data.get('usage', {})
+                                if usage:
+                                    usage_data['output_tokens'] = usage.get('completion_tokens', 0) or usage.get('output_tokens', 0)
+                                    usage_data['input_tokens'] = usage.get('prompt_tokens', usage_data['input_tokens']) or usage.get('input_tokens', usage_data['input_tokens'])
+                        except (json.JSONDecodeError, ValueError):
+                            pass
                     yield line + '\n\n' # type: ignore
+            
+            # Запись статистики после завершения потока
+            if STATS_ENABLED:
+                asyncio.run(record_request_async(account_id, 200, model, usage_data['input_tokens'], usage_data['output_tokens']))  # type: ignore
+
         return StreamingResponse(
             stream_generator(),
             status_code=resp.status_code, # type: ignore
@@ -346,6 +367,15 @@ async def proxy(request: Request):
         raw_response = resp.text # type: ignore
         try:
             data = json.loads(raw_response)
+            # Извлекаем токены из non-stream ответа
+            usage = data.get('usage', {})
+            output_tokens = usage.get('completion_tokens', 0) or usage.get('output_tokens', 0)
+            input_tokens = usage.get('prompt_tokens', input_tokens) or usage.get('input_tokens', input_tokens)
+            
+            # Запись статистики
+            if STATS_ENABLED:
+                await record_request_async(account_id, 200, model, input_tokens, output_tokens)  # type: ignore
+            
             # Проверяем, есть ли в ответе поле tool_calls (в формате OpenAI)
             if 'choices' in data and data['choices']:
                 message = data['choices'][0].get('message', {})
