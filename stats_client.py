@@ -62,6 +62,9 @@ def record_request(account_id: str, status_code: int, model: str | None = None, 
     # Убеждаемся что WAL режим включён (на случай если БД создана старой версией)
     cursor.execute("PRAGMA journal_mode=WAL")
     
+    # Блокируем запись для других потоков до завершения транзакции (защита от race condition)
+    conn.execute("BEGIN IMMEDIATE")
+    
     now = int(time.time())
     
     # Проверяем существование аккаунта
@@ -91,9 +94,9 @@ def record_request(account_id: str, status_code: int, model: str | None = None, 
                 (now, 100 if status_code == 429 else 1, now, now if status_code == 429 else None, account_id)
             )
         else:
-            # Проверка на сброс (24 часа)
-            if now - first_request_at > 86400:
-                # Сброс счётчика
+            # Сброс в 00:00 UTC (разные сутки)
+            if now // 86400 > first_request_at // 86400:
+                # Сброс: обнуляем счётчик, обновляем first_request_at на сегодня
                 cursor.execute(
                     """UPDATE account_stats 
                        SET request_count = 1, first_request_at = ?, last_request_at = ?, last_429_at = ?
@@ -113,7 +116,7 @@ def record_request(account_id: str, status_code: int, model: str | None = None, 
                 else:
                     cursor.execute(
                         """UPDATE account_stats 
-                           SET request_count = request_count + 1, last_request_at = ?
+                           SET request_count = MIN(request_count + 1, 100), last_request_at = ?
                            WHERE account_id = ?""",
                         (now, account_id)
                     )
@@ -155,8 +158,10 @@ def get_all_stats() -> list[dict]:
             reset_at = None
         else:
             first_request_at = row["first_request_at"]
-            resets_in = max(0, 86400 - (now - first_request_at))
-            reset_at = first_request_at + 86400
+            # reset_at = следующая полночь UTC
+            next_midnight = (now // 86400 + 1) * 86400
+            resets_in = max(0, next_midnight - now)
+            reset_at = next_midnight
         
         # Определение статуса
         if row["last_429_at"] and row["last_429_at"] >= first_request_at:
@@ -184,12 +189,12 @@ def get_all_stats() -> list[dict]:
     return result
 
 
-def get_recent_requests(limit: int = 50) -> list[dict]:
+def get_recent_requests(limit: int | None = None) -> list[dict]:
     """
-    Получить последние запросы из лога.
+    Получить ВСЕ запросы из лога.
     
     Args:
-        limit: Максимальное количество записей
+        limit: НЕ используется — брать все данные
         
     Returns:
         Список словарей с информацией о запросах
@@ -200,17 +205,19 @@ def get_recent_requests(limit: int = 50) -> list[dict]:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # Брать ВСЕ запросы (без LIMIT)
     cursor.execute("""
-        SELECT * FROM request_log 
-        ORDER BY timestamp DESC 
-        LIMIT ?
-    """, (limit,))
+        SELECT id, account_id, timestamp, status_code, model, input_tokens, output_tokens 
+        FROM request_log 
+        ORDER BY timestamp DESC
+    """)
     rows = cursor.fetchall()
     
     result = []
     for row in rows:
         dt = datetime.fromtimestamp(row["timestamp"])
         result.append({
+            "id": row["id"],
             "datetime": dt.strftime("%d.%m.%Y %H:%M"),
             "account_id": row["account_id"],
             "model": row["model"] or "unknown",
@@ -221,6 +228,114 @@ def get_recent_requests(limit: int = 50) -> list[dict]:
     
     conn.close()
     return result
+
+
+def get_account_states() -> dict[str, dict]:
+    """
+    Получить состояние всех аккаунтов: request_count, first_request_at, resets_in.
+    Возвращает dict: {account_id: {"request_count": int, "first_request_at": int|None, "resets_in": int}}
+    """
+    now = int(time.time())
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT account_id, request_count, first_request_at FROM account_stats")
+    rows = cursor.fetchall()
+
+    result = {}
+    for row in rows:
+        first_at = row["first_request_at"]
+        if first_at is not None and now // 86400 > first_at // 86400:
+            resets_in = 0  # Уже сбросился (новые сутки)
+        elif first_at is not None:
+            next_midnight = (now // 86400 + 1) * 86400
+            resets_in = max(0, next_midnight - now)
+        else:
+            resets_in = 0
+
+        result[row["account_id"]] = {
+            "request_count": row["request_count"],
+            "first_request_at": first_at,
+            "resets_in": resets_in
+        }
+
+    conn.close()
+    return result
+
+
+def is_account_available(account_id: str) -> bool:
+    """
+    Проверить доступен ли аккаунт (request_count < 100 или уже сбросился).
+    """
+    now = int(time.time())
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT request_count, first_request_at FROM account_stats WHERE account_id = ?", (account_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None:
+        return True  # Нет записи — аккаунт новый, доступен
+
+    if row["request_count"] < 100:
+        return True  # Ещё есть место
+
+    # Проверить сброс (00:00 UTC — разные сутки)
+    if row["first_request_at"] is not None and now // 86400 > row["first_request_at"] // 86400:
+        return True  # Сбросился
+
+    return False  # Исчерпан
+
+
+def check_daily_reset():
+    """
+    Проверить и выполнить дневной сброс.
+    Сброс происходит в 00:00 UTC (07:00 Новосибирск).
+    Если текущие сутки отличаются от дня первого запроса — сбросить счётчик.
+    Вызывать при старте приложения.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Блокируем запись для других потоков до завершения транзакции
+    conn.execute("BEGIN IMMEDIATE")
+
+    now = int(time.time())
+    today = now // 86400  # Текущие сутки UTC
+
+    # Найти аккаунты которые ещё не сброшены сегодня
+    cursor.execute("""
+        SELECT account_id, first_request_at FROM account_stats
+        WHERE first_request_at IS NOT NULL
+    """)
+    rows = cursor.fetchall()
+
+    reset_count = 0
+    for row in rows:
+        account_id = row[0]
+        first_day = row[1] // 86400
+
+        if today > first_day:
+            # Разные сутки — сбросить
+            cursor.execute("""
+                UPDATE account_stats
+                SET request_count = 0, first_request_at = ?, last_429_at = NULL
+                WHERE account_id = ?
+            """, (now, account_id))
+            reset_count += 1
+
+    conn.commit()
+    conn.close()
+
+    if reset_count > 0:
+        print(f"[stats] Дневной сброс: {reset_count} аккаунтов обнулено")
+    else:
+        print("[stats] Дневной сброс: все аккаунты уже сброшены или нет данных")
 
 
 def init_accounts(account_ids: list[str]):

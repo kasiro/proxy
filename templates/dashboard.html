@@ -1,151 +1,103 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenRouter Dashboard</title>
-    <!--
-    УЛУЧШЕННЫЕ ФИЛЬТРЫ ДЛЯ ИСТОРИИ ЗАПРОСОВ:
-    1. Мульти-выбор (checkboxes) для аккаунтов, моделей, статусов
-    2. Поиск с live-фильтрацией (debounce 300мс)
-    3. Кастомный период (date picker) + пресеты (Сегодня, Вчера)
-    4. Фильтр по токенам (input/output от и до)
-    5. Пресеты фильтров (сохранение в localStorage)
-    6. Быстрые фильтры (Только 429, Только ошибки, Только успехи)
-    -->
-    <!-- Hallmark · pre-emit critique: P4 H5 E4 S4 R5 V5 -->
+    <title>OdiRouter Dashboard</title>
+    <!-- Hallmark · pre-emit critique: P5 H4 E5 S4 R5 V5 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
-        /* === DESIGN TOKENS === */
+        /* ═══════════════════════════════════════════
+           DESIGN TOKENS — OKLCH, 4pt grid
+           ═══════════════════════════════════════════ */
         :root {
             /* Typography */
             --font-display: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
             --font-body: 'Inter', system-ui, -apple-system, sans-serif;
             --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-            
-            /* Color palette - OKLCH with tint toward anchor hue (blue) - Light theme (default) */
-            --color-paper: oklch(98% 0.01 240);
-            --color-paper-2: oklch(96% 0.015 240);
-            --color-paper-3: oklch(94% 0.02 240);
-            --color-ink: oklch(20% 0.02 240);
-            --color-ink-muted: oklch(45% 0.02 240);
-            --color-border: oklch(85% 0.02 240);
-            
-            /* Status colors - named tokens, no inline hex */
-            --color-success: oklch(65% 0.18 140);
-            --color-success-bg: oklch(95% 0.04 140);
-            --color-success-ink: oklch(25% 0.08 140);
-            --color-warning: oklch(75% 0.15 85);
-            --color-warning-bg: oklch(96% 0.05 85);
-            --color-warning-ink: oklch(30% 0.1 85);
-            --color-error: oklch(60% 0.2 25);
-            --color-error-bg: oklch(95% 0.05 25);
-            --color-error-ink: oklch(25% 0.08 25);
-            
-            /* Accent - blue anchor */
-            --color-accent: oklch(55% 0.2 250);
-            --color-accent-hover: oklch(50% 0.22 250);
-            --color-accent-active: oklch(45% 0.24 250);
-            --color-accent-bg: oklch(95% 0.05 250);
-            --color-accent-ink: oklch(98% 0.01 250);
-            
-            /* Metrics */
-            --color-metric-input: oklch(65% 0.18 140);
-            --color-metric-output: oklch(65% 0.18 30);
-            --color-metric-total: oklch(60% 0.2 250);
-            
-            /* Spacing scale - 4pt grid */
-            --space-xs: 0.25rem;   /* 4px */
-            --space-sm: 0.5rem;    /* 8px */
-            --space-md: 1rem;      /* 16px */
-            --space-lg: 1.5rem;    /* 24px */
-            --space-xl: 2rem;      /* 32px */
-            --space-2xl: 3rem;     /* 48px */
-            
+
+            /* Spacing — 4pt grid */
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-6: 24px;
+            --space-8: 32px;
+            --space-12: 48px;
+
             /* Motion */
-            --dur-short: 150ms;
-            --dur-med: 250ms;
+            --dur-fast: 120ms;
+            --dur-normal: 200ms;
             --ease-out: cubic-bezier(0.33, 0.85, 0.4, 0.96);
-            --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-            
+
             /* Focus */
-            --color-focus: oklch(55% 0.2 250);
-            --focus-ring: 2px solid var(--color-focus);
+            --focus-ring: 2px solid var(--accent);
             --focus-offset: 2px;
+
+            /* Border radius */
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+            --radius-full: 9999px;
         }
-        
-        /* Dark theme */
+
+        /* ═══ DARK THEME (default) ═══ */
         [data-theme="dark"] {
-            --color-paper: oklch(15% 0.02 240);
-            --color-paper-2: oklch(20% 0.02 240);
-            --color-paper-3: oklch(25% 0.02 240);
-            --color-ink: oklch(95% 0.01 240);
-            --color-ink-muted: oklch(70% 0.02 240);
-            --color-border: oklch(30% 0.02 240);
-            
-            /* Status colors - adjusted for dark theme */
-            --color-success: oklch(70% 0.18 140);
-            --color-success-bg: oklch(20% 0.04 140);
-            --color-success-ink: oklch(85% 0.08 140);
-            --color-warning: oklch(80% 0.15 85);
-            --color-warning-bg: oklch(25% 0.05 85);
-            --color-warning-ink: oklch(90% 0.1 85);
-            --color-error: oklch(70% 0.2 25);
-            --color-error-bg: oklch(22% 0.05 25);
-            --color-error-ink: oklch(85% 0.08 25);
-            
-            /* Accent - blue anchor */
-            --color-accent: oklch(65% 0.2 250);
-            --color-accent-hover: oklch(70% 0.22 250);
-            --color-accent-active: oklch(60% 0.24 250);
-            --color-accent-bg: oklch(25% 0.05 250);
-            --color-accent-ink: oklch(15% 0.01 250);
-            
-            /* Metrics */
-            --color-metric-input: oklch(70% 0.18 140);
-            --color-metric-output: oklch(70% 0.18 30);
-            --color-metric-total: oklch(65% 0.2 250);
-            
-            /* Focus */
-            --color-focus: oklch(65% 0.2 250);
+            --bg-primary: oklch(13% 0.01 260);
+            --bg-surface: oklch(17% 0.01 260);
+            --bg-card: oklch(20% 0.01 260);
+            --border: oklch(28% 0.01 260);
+            --text-primary: oklch(90% 0.01 260);
+            --text-muted: oklch(55% 0.02 260);
+            --accent: oklch(65% 0.2 250);
+            --accent-hover: oklch(70% 0.22 250);
+            --accent-active: oklch(60% 0.24 250);
+            --accent-text: oklch(13% 0.01 260);
+            --success: oklch(70% 0.18 140);
+            --success-bg: oklch(20% 0.04 140);
+            --success-text: oklch(85% 0.08 140);
+            --warning: oklch(75% 0.16 85);
+            --warning-bg: oklch(25% 0.05 85);
+            --warning-text: oklch(90% 0.1 85);
+            --error: oklch(65% 0.2 25);
+            --error-bg: oklch(22% 0.05 25);
+            --error-text: oklch(85% 0.08 25);
+            --metric-input: oklch(70% 0.18 140);
+            --metric-output: oklch(70% 0.18 30);
+            --metric-total: oklch(65% 0.2 250);
+            --row-hover: oklch(22% 0.01 260);
+            --input-bg: oklch(15% 0.01 260);
         }
-        
-        /* Theme toggle button */
-        .theme-toggle-btn {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            border: 1px solid var(--color-border);
-            background: var(--color-paper);
-            color: var(--color-ink);
-            cursor: pointer;
-            display: grid;
-            place-items: center;
-            transition: background-color var(--dur-short) var(--ease-out),
-                        border-color var(--dur-short) var(--ease-out);
-            position: relative;
+
+        /* ═══ LIGHT THEME ═══ */
+        [data-theme="light"] {
+            --bg-primary: oklch(97% 0.005 260);
+            --bg-surface: oklch(100% 0 0);
+            --bg-card: oklch(100% 0 0);
+            --border: oklch(88% 0.01 260);
+            --text-primary: oklch(15% 0.02 260);
+            --text-muted: oklch(45% 0.02 260);
+            --accent: oklch(55% 0.2 250);
+            --accent-hover: oklch(50% 0.22 250);
+            --accent-active: oklch(45% 0.24 250);
+            --accent-text: oklch(98% 0.01 250);
+            --success: oklch(65% 0.18 140);
+            --success-bg: oklch(95% 0.04 140);
+            --success-text: oklch(25% 0.08 140);
+            --warning: oklch(75% 0.16 85);
+            --warning-bg: oklch(96% 0.05 85);
+            --warning-text: oklch(30% 0.1 85);
+            --error: oklch(60% 0.2 25);
+            --error-bg: oklch(95% 0.05 25);
+            --error-text: oklch(25% 0.08 25);
+            --metric-input: oklch(65% 0.18 140);
+            --metric-output: oklch(65% 0.18 30);
+            --metric-total: oklch(55% 0.2 250);
+            --row-hover: oklch(95% 0.005 260);
+            --input-bg: oklch(100% 0 0);
         }
-        
-        .theme-toggle-btn:hover {
-            background: var(--color-border);
-        }
-        
-        .theme-toggle-btn:focus-visible {
-            outline: var(--focus-ring);
-            outline-offset: var(--focus-offset);
-        }
-        
-        .theme-toggle-btn svg {
-            width: 20px;
-            height: 20px;
-        }
-        
-        .sun-icon { display: none; }
-        .moon-icon { display: block; }
-        
-        .theme-toggle-btn.dark .sun-icon { display: block; }
-        .theme-toggle-btn.dark .moon-icon { display: none; }
-        
-        /* Reduced motion */
+
+        /* ═══ REDUCED MOTION ═══ */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
@@ -153,555 +105,773 @@
                 transition-duration: 0.01ms !important;
             }
         }
-        
-        /* === BASE === */
+
+        /* ═══ BASE ═══ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         html {
             overflow-x: clip;
             font-family: var(--font-body);
             font-size: 16px;
-            line-height: 1.55;
-            color: var(--color-ink);
-            background: var(--color-paper);
+            line-height: 1.5;
+            color: var(--text-primary);
+            background: var(--bg-primary);
         }
-        
+
         body {
             margin: 0;
             min-height: 100vh;
             overflow-x: clip;
         }
-        
-        /* === TYPOGRAPHY === */
-        h1, h2, h3, h4, h5, h6 {
+
+        /* ═══ TYPOGRAPHY ═══ */
+        h1, h2, h3 {
             font-family: var(--font-display);
             font-weight: 700;
-            line-height: 1.1;
-            margin: 0 0 var(--space-md);
-            font-style: normal; /* No italic headers */
+            line-height: 1.15;
+            margin: 0;
+            font-style: normal;
         }
-        
-        h1 { font-size: clamp(1.5rem, 4vw, 2rem); }
-        h2 { font-size: clamp(1.25rem, 3vw, 1.5rem); }
-        
-        .subtitle {
-            color: var(--color-ink-muted);
-            font-size: 0.95rem;
-            margin-bottom: var(--space-xl);
+
+        h1 {
+            font-size: clamp(1.25rem, 3vw, 1.75rem);
         }
-        
-        /* === LAYOUT === */
+
+        h2 {
+            font-size: clamp(1rem, 2.5vw, 1.25rem);
+        }
+
+        /* ═══ LAYOUT ═══ */
         .container {
             width: 100%;
             max-width: 1400px;
             margin: 0 auto;
-            padding: var(--space-xl);
+            padding: var(--space-8);
         }
-        
+
         @media (max-width: 768px) {
             .container {
-                padding: var(--space-md);
+                padding: var(--space-4);
             }
         }
-        
-        /* === CARDS === */
-        .card {
-            background: var(--color-paper-2);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            padding: var(--space-lg);
-            transition: background-color var(--dur-short) var(--ease-out),
-                        border-color var(--dur-short) var(--ease-out);
+
+        /* ═══ HEADER ═══ */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-4);
+            margin-bottom: var(--space-8);
         }
-        
-        .card:hover {
-            border-color: var(--color-accent);
-        }
-        
-        /* === STATS GRID - Asymmetric, not 4 equal columns === */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-            gap: var(--space-lg);
-            margin-bottom: var(--space-xl);
-        }
-        
-        .stat-card {
-            background: var(--color-paper);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            padding: var(--space-lg);
-            transition: transform var(--dur-short) var(--ease-out),
-                        border-color var(--dur-short) var(--ease-out),
-                        background-color var(--dur-short) var(--ease-out);
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--color-accent);
-        }
-        
-        .stat-label {
+
+        .header-meta {
+            color: var(--text-muted);
             font-size: 0.875rem;
-            color: var(--color-ink-muted);
-            margin-bottom: var(--space-xs);
+            margin-top: var(--space-1);
         }
-        
+
+        .theme-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            transition: background-color var(--dur-fast) var(--ease-out),
+                        border-color var(--dur-fast) var(--ease-out);
+        }
+
+        .theme-btn:hover {
+            background: var(--border);
+        }
+
+        .theme-btn:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
+        .theme-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .icon-sun { display: none; }
+        .icon-moon { display: block; }
+        [data-theme="dark"] .icon-sun { display: block; }
+        [data-theme="dark"] .icon-moon { display: none; }
+        [data-theme="light"] .icon-sun { display: none; }
+        [data-theme="light"] .icon-moon { display: block; }
+
+        /* ═══ STAT CARDS ═══ */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+
+        @media (max-width: 900px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4) var(--space-6);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            margin-bottom: var(--space-1);
+        }
+
         .stat-value {
-            font-size: 2rem;
+            font-size: 1.75rem;
             font-weight: 700;
             font-family: var(--font-display);
             font-variant-numeric: tabular-nums;
+            line-height: 1.2;
         }
-        
-        .stat-value.success { color: var(--color-success); }
-        .stat-value.warning { color: var(--color-warning); }
-        .stat-value.error { color: var(--color-error); }
-        .stat-value.metric { color: var(--color-metric-total); }
-        
+
+        .stat-value--success { color: var(--success); }
+        .stat-value--warning { color: var(--warning); }
+        .stat-value--error { color: var(--error); }
+        .stat-value--accent { color: var(--metric-total); }
+
         .stat-detail {
             font-size: 0.8rem;
-            color: var(--color-ink-muted);
-            margin-top: var(--space-xs);
+            color: var(--text-muted);
+            margin-top: var(--space-1);
             font-variant-numeric: tabular-nums;
         }
-        
-        /* === STATUS BADGES === */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: var(--space-xs) var(--space-sm);
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
+
+        /* ═══ TOKEN ROW (2 cards) ═══ */
+        .tokens-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
         }
-        
-        .status-badge.active {
-            background: var(--color-success-bg);
-            color: var(--color-success-ink);
+
+        @media (max-width: 600px) {
+            .tokens-row {
+                grid-template-columns: 1fr;
+            }
         }
-        
-        .status-badge.warning {
-            background: var(--color-warning-bg);
-            color: var(--color-warning-ink);
-        }
-        
-        .status-badge.exhausted {
-            background: var(--color-error-bg);
-            color: var(--color-error-ink);
-        }
-        
-        /* === PROGRESS BAR === */
-        .progress-track {
-            width: 100%;
-            height: 8px;
-            background: var(--color-paper-3);
-            border-radius: 9999px;
-            overflow: hidden;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            border-radius: 9999px;
-            transition: width var(--dur-med) var(--ease-out);
-        }
-        
-        .progress-bar.active { background: var(--color-success); }
-        .progress-bar.warning { background: var(--color-warning); }
-        .progress-bar.exhausted { background: var(--color-error); }
-        
-        /* === ROW BACKGROUNDS === */
-        .row-active { background: var(--color-success-bg); }
-        .row-warning { background: var(--color-warning-bg); }
-        .row-exhausted { background: var(--color-error-bg); }
-        
-        /* === TABLES === */
-        .table-container {
+
+        /* ═══ TABLE CONTAINER ═══ */
+        .table-wrap {
             overflow-x: auto;
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            margin-bottom: var(--space-xl);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-6);
         }
-        
+
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
         }
-        
+
         thead {
-            background: var(--color-paper-3);
-            border-bottom: 1px solid var(--color-border);
+            background: var(--bg-surface);
         }
-        
+
         th {
             text-align: left;
-            padding: var(--space-md) var(--space-lg);
-            font-size: 0.75rem;
+            padding: var(--space-3) var(--space-4);
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--color-ink-muted);
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
         }
-        
+
         td {
-            padding: var(--space-md) var(--space-lg);
-            border-bottom: 1px solid var(--color-border);
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--border);
             vertical-align: middle;
         }
-        
-        tbody tr:hover {
-            background: var(--color-paper-3);
+
+        tbody tr {
+            transition: background-color var(--dur-fast) var(--ease-out);
         }
-        
+
+        tbody tr:hover {
+            background: var(--row-hover);
+        }
+
         tbody tr:last-child td {
             border-bottom: none;
         }
-        
-        /* === FILTERS PANEL === */
-        .filters-panel {
-            background: var(--color-paper-2);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            padding: var(--space-lg);
-            margin: 0 0 var(--space-lg);
+
+        /* Row status colors */
+        .row-active { background: var(--success-bg); }
+        .row-warning { background: var(--warning-bg); }
+        .row-exhausted { background: var(--error-bg); }
+
+        /* ═══ STATUS BADGE ═══ */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-full);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
         }
-        
-        .filter-grid {
+
+        .badge--active {
+            background: var(--success-bg);
+            color: var(--success-text);
+        }
+
+        .badge--warning {
+            background: var(--warning-bg);
+            color: var(--warning-text);
+        }
+
+        .badge--exhausted {
+            background: var(--error-bg);
+            color: var(--error-text);
+        }
+
+        /* ═══ PROGRESS BAR ═══ */
+        .progress {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-surface);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: var(--radius-full);
+            transition: width var(--dur-normal) var(--ease-out);
+        }
+
+        .progress-fill--active { background: var(--success); }
+        .progress-fill--warning { background: var(--warning); }
+        .progress-fill--exhausted { background: var(--error); }
+
+        /* ═══ CARD (generic section wrapper) ═══ */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-6);
+        }
+
+        .card-header {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-body {
+            padding: var(--space-6);
+        }
+
+        @media (max-width: 768px) {
+            .card-body {
+                padding: var(--space-4);
+            }
+        }
+
+        /* ═══ FILTERS ═══ */
+        .filters {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-            gap: var(--space-md);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
         }
-        
+
         .filter-group {
             display: flex;
             flex-direction: column;
         }
-        
-        .filter-group label {
-            font-size: 0.875rem;
-            color: var(--color-ink-muted);
-            margin-bottom: var(--space-xs);
+
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            margin-bottom: var(--space-1);
         }
-        
-        .filter-group input[type="text"],
-        .filter-group input[type="number"],
-        .filter-group input[type="datetime-local"],
-        .filter-group select {
-            padding: var(--space-sm);
-            border: 1px solid var(--color-border);
-            border-radius: 6px;
-            font-size: 0.875rem;
+
+        .multi-select {
+            max-height: 140px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--space-1);
+            background: var(--input-bg);
+        }
+
+        .multi-select label {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-1) var(--space-2);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            transition: background-color var(--dur-fast) var(--ease-out);
+        }
+
+        .multi-select label:hover {
+            background: var(--bg-surface);
+        }
+
+        .multi-select input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+
+        select,
+        input[type="number"],
+        input[type="datetime-local"] {
+            padding: var(--space-2) var(--space-3);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 0.8rem;
             font-family: var(--font-body);
-            color: var(--color-ink);
-            background: var(--color-paper);
-            transition: border-color var(--dur-short) var(--ease-out),
-                        box-shadow var(--dur-short) var(--ease-out);
-            min-height: 44px; /* Touch target */
+            color: var(--text-primary);
+            background: var(--input-bg);
+            min-height: 33px;
+            transition: border-color var(--dur-fast) var(--ease-out);
         }
-        
-        .filter-group input:focus,
-        .filter-group select:focus {
+
+        select:focus,
+        input[type="number"]:focus,
+        input[type="datetime-local"]:focus {
             outline: var(--focus-ring);
             outline-offset: var(--focus-offset);
-            border-color: var(--color-focus);
+            border-color: var(--accent);
         }
-        
-        .multi-select {
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid var(--color-border);
-            border-radius: 6px;
-            padding: var(--space-xs);
-            background: var(--color-paper);
-            transition: background-color var(--dur-short) var(--ease-out),
-                        border-color var(--dur-short) var(--ease-out);
-        }
-        
-        .multi-select label {
-            display: block;
-            padding: var(--space-xs);
-            cursor: pointer;
-            border-radius: 4px;
-            transition: background-color var(--dur-short) var(--ease-out);
-        }
-        
-        .multi-select label:hover {
-            background: var(--color-paper-2);
-        }
-        
-        .token-filter {
+
+        .token-fields {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: var(--space-sm);
+            gap: var(--space-2);
         }
-        
-        .token-filter input {
+
+        .token-fields input {
             min-width: 0;
             width: 100%;
         }
-        
-        /* === BUTTONS - 8 states === */
+
+        /* Token summary row — spans full width */
+        .filter-group--wide {
+            grid-column: 1 / -1;
+        }
+
+        /* ═══ QUICK FILTERS ═══ */
+        .quick-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-2);
+            margin-bottom: var(--space-4);
+        }
+
+        /* ═══ BUTTONS ═══ */
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: var(--space-sm) var(--space-lg);
+            gap: var(--space-1);
+            padding: var(--space-1) var(--space-4);
             border: none;
-            border-radius: 6px;
-            font-size: 0.875rem;
+            border-radius: var(--radius-md);
+            font-size: 0.8rem;
             font-weight: 500;
             font-family: var(--font-body);
             cursor: pointer;
-            transition: background-color var(--dur-short) var(--ease-out),
-                        transform var(--dur-short) var(--ease-out);
-            min-height: 44px; /* Touch target */
-            white-space: nowrap; /* Never wrap */
+            min-height: 33px;
+            white-space: nowrap;
+            transition: background-color var(--dur-fast) var(--ease-out),
+                        transform var(--dur-fast) var(--ease-out);
         }
-        
-        .btn:active {
+
+        .btn:active:not(:disabled) {
             transform: scale(0.98);
         }
-        
+
         .btn:focus-visible {
             outline: var(--focus-ring);
             outline-offset: var(--focus-offset);
         }
-        
+
         .btn:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
-        
-        .btn-primary {
-            background: var(--color-accent);
-            color: var(--color-accent-ink);
+
+        .btn--accent {
+            background: var(--accent);
+            color: var(--accent-text);
         }
-        
-        .btn-primary:hover:not(:disabled) {
-            background: var(--color-accent-hover);
+
+        .btn--accent:hover:not(:disabled) {
+            background: var(--accent-hover);
         }
-        
-        .btn-primary:active:not(:disabled) {
-            background: var(--color-accent-active);
+
+        .btn--accent:active:not(:disabled) {
+            background: var(--accent-active);
         }
-        
-        .btn-secondary {
-            background: var(--color-paper-3);
-            color: var(--color-ink);
-            transition: background-color var(--dur-short) var(--ease-out),
-                        color var(--dur-short) var(--ease-out);
+
+        .btn--ghost {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
         }
-        
-        .btn-secondary:hover:not(:disabled) {
-            background: var(--color-border);
+
+        .btn--ghost:hover:not(:disabled) {
+            background: var(--border);
         }
-        
-        .btn-danger {
-            background: var(--color-error);
-            color: var(--color-error-ink);
+
+        .btn--error {
+            background: var(--error);
+            color: var(--error-text);
         }
-        
-        .btn-danger:hover:not(:disabled) {
-            background: oklch(55% 0.22 25);
+
+        .btn--error:hover:not(:disabled) {
+            opacity: 0.9;
         }
-        
-        /* Quick filters - varied colors */
-        .quick-filters {
-            display: flex;
-            flex-wrap: wrap;
-            gap: var(--space-sm);
-            margin-bottom: var(--space-md);
+
+        .btn--warning {
+            background: var(--warning);
+            color: var(--warning-text);
         }
-        
-        .quick-filters .btn:nth-child(1) {
-            background: var(--color-error);
-            color: var(--color-error-ink);
+
+        .btn--success {
+            background: var(--success);
+            color: var(--success-text);
         }
-        .quick-filters .btn:nth-child(1):hover {
-            background: oklch(55% 0.22 25);
+
+        .btn--sm {
+            padding: var(--space-1) var(--space-2);
+            font-size: 0.75rem;
         }
-        
-        .quick-filters .btn:nth-child(2) {
-            background: var(--color-warning);
-            color: var(--color-warning-ink);
-        }
-        .quick-filters .btn:nth-child(2):hover {
-            background: oklch(70% 0.17 85);
-        }
-        
-        .quick-filters .btn:nth-child(3) {
-            background: var(--color-success);
-            color: var(--color-success-ink);
-        }
-        .quick-filters .btn:nth-child(3):hover {
-            background: oklch(60% 0.2 140);
-        }
-        
-        .quick-filters .btn:nth-child(4) {
-            background: var(--color-paper-3);
-            color: var(--color-ink);
-        }
-        .quick-filters .btn:nth-child(4):hover {
-            background: var(--color-border);
-        }
-        
-        /* Presets */
+
+        /* ═══ PRESETS ═══ */
         .presets {
-            margin-top: var(--space-md);
-            padding-top: var(--space-md);
-            border-top: 1px solid var(--color-border);
             display: flex;
             align-items: center;
             flex-wrap: wrap;
-            gap: var(--space-sm);
+            gap: var(--space-2);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--border);
+            margin-top: var(--space-4);
         }
-        
+
+        .presets-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
         .presets-list {
             display: inline-flex;
             align-items: center;
-            gap: var(--space-xs);
+            gap: var(--space-1);
         }
-        
-        .presets-list button {
-            padding: var(--space-xs) var(--space-sm);
-            border-radius: 4px;
-            background: var(--color-paper-3);
-            color: var(--color-ink);
+
+        .preset-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background-color var(--dur-fast) var(--ease-out);
+        }
+
+        [data-theme="dark"] .preset-chip {
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .preset-chip span {
+            color: var(--text-primary);
+        }
+
+        .preset-chip:hover {
+            background: var(--border);
+        }
+
+        .preset-delete {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0;
             font-size: 0.8rem;
+            line-height: 1;
+            transition: color var(--dur-fast) var(--ease-out);
         }
-        
-        .presets-list button:hover {
-            background: var(--color-border);
+
+        .preset-delete:hover {
+            color: var(--error);
         }
-        
-        .presets-list button.delete-btn {
-            background: var(--color-error-bg);
-            color: var(--color-error-ink);
-        }
-        
-        .presets-list button.delete-btn:hover {
-            background: var(--color-error);
-            color: var(--color-error-ink);
-        }
-        
-        /* Actions */
+
+        /* ═══ ACTIONS ROW ═══ */
         .actions {
-            margin-top: var(--space-md);
             display: flex;
-            gap: var(--space-sm);
+            gap: var(--space-2);
+            margin-top: var(--space-4);
         }
-        
-        /* Hidden utility */
+
+        /* ═══ FILTER SUMMARY ═══ */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        @media (max-width: 600px) {
+            .summary-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .summary-card {
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+
+        .summary-card .stat-label {
+            margin-bottom: var(--space-1);
+        }
+
+        .summary-card .stat-value {
+            font-size: 1.25rem;
+        }
+
+        /* ═══ PAGINATION ═══ */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: var(--space-4);
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: var(--space-1) var(--space-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 33px;
+            min-height: 33px;
+            font-size: 0.8rem;
+            transition: background-color var(--dur-fast) var(--ease-out);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: var(--border);
+        }
+
+        .page-info {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            padding: 0 var(--space-2);
+            white-space: nowrap;
+        }
+
+        /* ═══ SSE STATUS ═══ */
+        .sse-bar {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-4) 0;
+            border-top: 1px solid var(--border);
+            margin-top: var(--space-4);
+        }
+
+        .sse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: var(--radius-full);
+            background: var(--border);
+            flex-shrink: 0;
+        }
+
+        .sse-dot--on {
+            background: var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .sse-dot--off {
+            background: var(--error);
+        }
+
+        .sse-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ═══ EMPTY STATE ═══ */
+        .empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: var(--space-8) var(--space-4);
+            font-size: 0.9rem;
+        }
+
+        /* ═══ MISC ═══ */
+        .mono {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
         .hidden {
             display: none !important;
         }
-        
-        /* SSE indicator */
-        .sse-status {
-            display: flex;
-            align-items: center;
-            gap: var(--space-sm);
-            margin-top: var(--space-lg);
-            padding-top: var(--space-lg);
-            border-top: 1px solid var(--color-border);
-        }
-        
-        .sse-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--color-border);
-            transition: background-color var(--dur-short) var(--ease-out);
-        }
-        
-        .sse-indicator.connected {
-            background: var(--color-success);
-            animation: pulse 2s var(--ease-in-out) infinite;
-        }
-        
-        .sse-indicator.disconnected {
-            background: var(--color-error);
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        /* Custom period grid */
+
+        /* Hide custom period by default */
         #custom-period {
-            grid-column: span 2;
+            display: none;
+            grid-column: 1 / -1;
         }
-        
-        @media (max-width: 768px) {
-            #custom-period {
-                grid-column: 1 / -1;
-            }
+
+        #custom-period.show {
+            display: flex;
+            gap: var(--space-4);
+            align-items: start;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-lg);">
+    <div id="app" class="container">
+        <!-- ═══ HEADER ═══ -->
+        <header class="header">
             <div>
-                <h1 style="margin: 0;">Мониторинг OpenRouter аккаунтов</h1>
-                <p class="subtitle" style="margin: var(--space-xs) 0 0 0;">
-                    Обновление в реальном времени • Лимит: 100 запросов / 24ч
+                <h1>OdiRouter Dashboard</h1>
+                <p class="header-meta">
+                    Обновление в реальном времени
+                    <span aria-hidden="true">/</span>
+                    Лимит: 100 запросов / 24ч
                 </p>
             </div>
-            <button id="theme-toggle" class="theme-toggle-btn" aria-label="Переключить на темную тему">
-                <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button
+                @click="toggleTheme"
+                class="theme-btn"
+                :aria-label="`Переключить на ${isDark ? 'светлую' : 'тёмную'} тему`"
+            >
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="5"/>
                     <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                 </svg>
-                <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                 </svg>
             </button>
         </header>
-        
-        <!-- Общая статистика -->
-        <div class="stats-grid">
-            <div class="stat-card">
+
+        <!-- ═══ STATS: 4 карточки ═══ -->
+        <div class="stats-row">
+            <div class="stat">
                 <div class="stat-label">Всего аккаунтов</div>
-                <div class="stat-value" id="total-accounts">0</div>
+                <div class="stat-value">{{ accounts.length }}</div>
             </div>
-            <div class="stat-card">
+            <div class="stat">
                 <div class="stat-label">Активные</div>
-                <div class="stat-value success" id="active-count">0</div>
+                <div class="stat-value stat-value--success">{{ activeCount }}</div>
             </div>
-            <div class="stat-card">
+            <div class="stat">
                 <div class="stat-label">Предупреждения</div>
-                <div class="stat-value warning" id="warning-count">0</div>
+                <div class="stat-value stat-value--warning">{{ warningCount }}</div>
             </div>
-            <div class="stat-card">
+            <div class="stat">
                 <div class="stat-label">Исчерпаны</div>
-                <div class="stat-value error" id="exhausted-count">0</div>
+                <div class="stat-value stat-value--error">{{ exhaustedCount }}</div>
             </div>
         </div>
-        
-        <!-- Токены за сегодня и месяц -->
-        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));">
-            <div class="stat-card">
+
+        <!-- ═══ TOKENS: 2 карточки ═══ -->
+        <div class="tokens-row">
+            <div class="stat">
                 <div class="stat-label">Токены за сегодня</div>
-                <div class="stat-value metric" id="today-tokens">0</div>
+                <div class="stat-value stat-value--accent">{{ formatTokens(stats.today.total) }}</div>
                 <div class="stat-detail">
-                    Input: <span id="today-input">0</span> | Output: <span id="today-output">0</span>
+                    Input: {{ formatTokens(stats.today.input) }}
+                    <span aria-hidden="true">/</span>
+                    Output: {{ formatTokens(stats.today.output) }}
                 </div>
             </div>
-            
-            <div class="stat-card">
+            <div class="stat">
                 <div class="stat-label">Токены за месяц</div>
-                <div class="stat-value metric" id="month-tokens">0</div>
+                <div class="stat-value stat-value--accent">{{ formatTokens(stats.month.total) }}</div>
                 <div class="stat-detail">
-                    Input: <span id="month-input">0</span> | Output: <span id="month-output">0</span>
+                    Input: {{ formatTokens(stats.month.input) }}
+                    <span aria-hidden="true">/</span>
+                    Output: {{ formatTokens(stats.month.output) }}
                 </div>
             </div>
         </div>
-        
-        <!-- Таблица аккаунтов -->
-        <div class="table-container">
+
+        <!-- ═══ ACCOUNTS TABLE ═══ -->
+        <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
@@ -712,72 +882,95 @@
                         <th>Сброс через</th>
                     </tr>
                 </thead>
-                <tbody id="accounts-table">
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: var(--color-ink-muted); padding: var(--space-xl);">
-                            Загрузка данных...
-                        </td>
-                    </tr>
+                <tbody>
+                    <template v-if="accounts.length === 0">
+                        <tr>
+                            <td colspan="5" class="empty">Загрузка данных...</td>
+                        </tr>
+                    </template>
+                    <template v-else>
+                        <tr v-for="acc in accounts" :key="acc.account_id" :class="`row-${acc.status}`">
+                            <td style="font-weight: 500;">account_{{ acc.account_id }}</td>
+                            <td class="mono">{{ acc.request_count }} / {{ acc.limit }}</td>
+                            <td style="min-width: 120px;">
+                                <div class="progress">
+                                    <div
+                                        class="progress-fill"
+                                        :class="`progress-fill--${acc.status}`"
+                                        :style="{ width: percentage(acc.request_count, acc.limit) + '%' }"
+                                    ></div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge" :class="`badge--${acc.status}`">{{ acc.status }}</span>
+                            </td>
+                            <td
+                                class="timer-cell mono"
+                                :data-account-id="acc.account_id"
+                                :data-reset-at="acc.reset_at || ''"
+                            >
+                                {{ formatResetTime(acc.reset_at) }}
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
-        
-        <!-- История запросов -->
-        <div class="card" style="padding: 0;">
-            <h2 style="padding: var(--space-lg); margin: 0; border-bottom: 1px solid var(--color-border);">
-                История запросов
-            </h2>
-            
-            <!-- Фильтры -->
-            <div class="filters-panel">
-                <!-- Быстрые фильтры -->
-                <div class="quick-filters">
-                    <button class="btn" onclick="quickFilter('429')">Только 429</button>
-                    <button class="btn" onclick="quickFilter('error')">Только ошибки</button>
-                    <button class="btn" onclick="quickFilter('success')">Только успехи</button>
-                    <button class="btn" onclick="resetFilters()">Сбросить</button>
+
+        <!-- ═══ HISTORY ═══ -->
+        <div class="card">
+            <div class="card-header">
+                <h2>История запросов</h2>
+            </div>
+            <div class="card-body">
+                <!-- Quick filters -->
+                <div class="quick-row">
+                    <button class="btn btn--error" @click="quickFilter('429')">429</button>
+                    <button class="btn btn--warning" @click="quickFilter('error')">Ошибки</button>
+                    <button class="btn btn--success" @click="quickFilter('success')">Успехи</button>
+                    <button class="btn btn--ghost" @click="resetFilters">Сбросить</button>
                 </div>
-                
-                <!-- Основные фильтры -->
-                <div class="filter-grid">
-                    <!-- Поиск -->
+
+                <!-- Filters grid -->
+                <div class="filters">
+                    <!-- Accounts -->
                     <div class="filter-group">
-                        <label for="filter-search">Поиск</label>
-                        <input type="text" id="filter-search" placeholder="Аккаунт, модель..." />
-                    </div>
-                    
-                    <!-- Аккаунты (multi) -->
-                    <div class="filter-group">
-                        <label>Аккаунты</label>
-                        <div id="filter-accounts" class="multi-select">
-                            <!-- Заполняется динамически -->
+                        <div class="filter-label">Аккаунты</div>
+                        <div class="multi-select">
+                            <label v-for="acc in uniqueAccounts" :key="acc">
+                                <input type="checkbox" :value="acc" v-model="filters.accounts" />
+                                account_{{ acc }}
+                            </label>
                         </div>
                     </div>
-                    
-                    <!-- Модели (multi) -->
+
+                    <!-- Models -->
                     <div class="filter-group">
-                        <label>Модели</label>
-                        <div id="filter-models" class="multi-select">
-                            <!-- Заполняется динамически -->
+                        <div class="filter-label">Модели</div>
+                        <div class="multi-select">
+                            <label v-for="model in uniqueModels" :key="model">
+                                <input type="checkbox" :value="model" v-model="filters.models" />
+                                {{ model }}
+                            </label>
                         </div>
                     </div>
-                    
-                    <!-- Статусы (multi) -->
+
+                    <!-- Statuses -->
                     <div class="filter-group">
-                        <label>Статусы</label>
-                        <div id="filter-statuses" class="multi-select">
-                            <label><input type="checkbox" value="200" /> 200 OK</label>
-                            <label><input type="checkbox" value="429" /> 429 Rate Limit</label>
-                            <label><input type="checkbox" value="500" /> 500 Error</label>
-                            <label><input type="checkbox" value="502" /> 502 Bad Gateway</label>
-                            <label><input type="checkbox" value="503" /> 503 Service Unavailable</label>
+                        <div class="filter-label">Статусы</div>
+                        <div class="multi-select">
+                            <label><input type="checkbox" value="200" v-model="filters.statuses" /> 200 OK</label>
+                            <label><input type="checkbox" value="429" v-model="filters.statuses" /> 429 Rate Limit</label>
+                            <label><input type="checkbox" value="500" v-model="filters.statuses" /> 500 Error</label>
+                            <label><input type="checkbox" value="502" v-model="filters.statuses" /> 502 Bad Gateway</label>
+                            <label><input type="checkbox" value="503" v-model="filters.statuses" /> 503 Service Unavailable</label>
                         </div>
                     </div>
-                    
-                    <!-- Период -->
+
+                    <!-- Period -->
                     <div class="filter-group">
-                        <label for="filter-period">Период</label>
-                        <select id="filter-period">
+                        <div class="filter-label" for="filter-period">Период</div>
+                        <select id="filter-period" v-model="filters.period">
                             <option value="all">Все время</option>
                             <option value="1h">Последний час</option>
                             <option value="24h">24 часа</option>
@@ -787,681 +980,544 @@
                             <option value="custom">Кастомный...</option>
                         </select>
                     </div>
-                    
-                    <!-- Кастомный период (скрыт по умолчанию) -->
-                    <div id="custom-period" class="filter-group hidden">
-                        <label for="filter-date-from">От</label>
-                        <input type="datetime-local" id="filter-date-from" />
-                        <label for="filter-date-to">До</label>
-                        <input type="datetime-local" id="filter-date-to" />
+
+                    <!-- Custom period (hidden by default) -->
+                    <div id="custom-period" class="filter-group" :class="{ show: filters.period === 'custom' }">
+                        <div class="filter-label">От</div>
+                        <input type="datetime-local" v-model="filters.dateFrom" />
+                        <div class="filter-label" style="margin-top: var(--space-2);">До</div>
+                        <input type="datetime-local" v-model="filters.dateTo" />
                     </div>
-                    
-                    <!-- Input токены -->
+
+                    <!-- Input tokens -->
                     <div class="filter-group">
-                        <label>Input токены</label>
-                        <div class="token-filter">
-                            <input type="number" id="filter-input-min" placeholder="От" />
-                            <input type="number" id="filter-input-max" placeholder="До" />
+                        <div class="filter-label">Input токены</div>
+                        <div class="token-fields">
+                            <input type="number" v-model="filters.inputMin" placeholder="От" />
+                            <input type="number" v-model="filters.inputMax" placeholder="До" />
                         </div>
                     </div>
-                    
-                    <!-- Output токены -->
+
+                    <!-- Output tokens -->
                     <div class="filter-group">
-                        <label>Output токены</label>
-                        <div class="token-filter">
-                            <input type="number" id="filter-output-min" placeholder="От" />
-                            <input type="number" id="filter-output-max" placeholder="До" />
+                        <div class="filter-label">Output токены</div>
+                        <div class="token-fields">
+                            <input type="number" v-model="filters.outputMin" placeholder="От" />
+                            <input type="number" v-model="filters.outputMax" placeholder="До" />
                         </div>
                     </div>
                 </div>
-                
-                <!-- Пресеты -->
+
+                <!-- Presets -->
                 <div class="presets">
-                    <span style="font-size: 0.875rem; color: var(--color-ink-muted);">Пресеты:</span>
-                    <button class="btn btn-primary" onclick="savePreset()" style="padding: var(--space-xs) var(--space-md); font-size: 0.8rem;">Сохранить</button>
-                    <div id="presets-list" class="presets-list">
-                        <!-- Заполняется динамически -->
+                    <span class="presets-label">Пресеты:</span>
+                    <button class="btn btn--accent btn--sm" @click="savePreset">Сохранить</button>
+                    <div class="presets-list">
+                        <template v-for="(preset, name) in presets" :key="name">
+                            <span class="preset-chip">
+                                <span @click="loadPreset(name)" style="cursor: pointer;">{{ name }}</span>
+                                <button class="preset-delete" @click="deletePreset(name)" :aria-label="`Удалить пресет ${name}`">✕</button>
+                            </span>
+                        </template>
                     </div>
                 </div>
-                
-                <!-- Кнопки действий -->
+
+                <!-- Actions -->
                 <div class="actions">
-                    <button class="btn btn-primary" onclick="applyFilters()">Применить</button>
-                    <button class="btn btn-secondary" onclick="resetFilters()">Сбросить</button>
+                    <button class="btn btn--accent" @click="applyFilters">Применить</button>
+                    <button class="btn btn--ghost" @click="resetFilters">Сбросить</button>
                 </div>
-            </div>
-            
-            <!-- Сводка по токенам (фильтр) -->
-            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); margin-bottom: var(--space-lg);">
-                <div class="stat-card">
-                    <div class="stat-label">Общее количество токенов</div>
-                    <div class="stat-value metric" id="filter-total-tokens">0</div>
+
+                <!-- Filter summary -->
+                <div class="summary-row" style="margin-top: var(--space-6);">
+                    <div class="summary-card">
+                        <div class="stat-label">Общее токенов</div>
+                        <div class="stat-value stat-value--accent">{{ formatTokens(filteredStats.total) }}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="stat-label">Input токены</div>
+                        <div class="stat-value" style="color: var(--metric-input);">{{ formatTokens(filteredStats.input) }}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="stat-label">Output токены</div>
+                        <div class="stat-value" style="color: var(--metric-output);">{{ formatTokens(filteredStats.output) }}</div>
+                    </div>
                 </div>
-                
-                <div class="stat-card">
-                    <div class="stat-label">Input токены (фильтр)</div>
-                    <div class="stat-value" style="color: var(--color-metric-input);" id="filter-input-total">0</div>
+
+                <!-- History table -->
+                <div class="table-wrap" style="margin-bottom: 0; border: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Дата + Время</th>
+                                <th>Аккаунт</th>
+                                <th>Модель</th>
+                                <th>Токены (in / out)</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-if="filteredRequests.length === 0">
+                                <tr>
+                                    <td colspan="6" class="empty">Нет данных о запросах</td>
+                                </tr>
+                            </template>
+                            <template v-else>
+                                <tr v-for="req in paginatedRequests" :key="req.id" :class="getRowClass(req.status_code)">
+                                    <td class="mono text-muted" style="font-size: 0.8rem;">{{ req.id }}</td>
+                                    <td class="mono" style="font-size: 0.8rem;">{{ req.datetime }}</td>
+                                    <td>account_{{ req.account_id }}</td>
+                                    <td>{{ req.model }}</td>
+                                    <td class="mono">
+                                        {{ req.input_tokens || '—' }} / {{ req.output_tokens || '—' }}
+                                    </td>
+                                    <td>
+                                        <span class="badge" :class="`badge--${getStatusClass(req.status_code)}`">{{ req.status_code }}</span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
-                
-                <div class="stat-card">
-                    <div class="stat-label">Output токены (фильтр)</div>
-                    <div class="stat-value" style="color: var(--color-metric-output);" id="filter-output-total">0</div>
+
+                <!-- Pagination -->
+                <div class="pagination" v-if="totalPages > 1">
+                    <button @click="goToPage(1)" :disabled="currentPage === 1">««</button>
+                    <button @click="prevPage" :disabled="currentPage === 1">«</button>
+                    <span class="page-info">
+                        {{ currentPage }} / {{ totalPages }} ({{ filteredRequests.length }} запросов)
+                    </span>
+                    <button @click="nextPage" :disabled="currentPage === totalPages">»</button>
+                    <button @click="goToPage(totalPages)" :disabled="currentPage === totalPages">»»</button>
                 </div>
-            </div>
-            
-            <div class="table-container" style="margin-bottom: 0; border: none; border-top: 1px solid var(--color-border);">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Дата + Время</th>
-                            <th>Аккаунт</th>
-                            <th>Модель</th>
-                            <th>Токены (in / out)</th>
-                            <th>Статус</th>
-                        </tr>
-                    </thead>
-                    <tbody id="requests-table">
-                        <tr>
-                            <td colspan="5" style="text-align: center; color: var(--color-ink-muted); padding: var(--space-xl);">
-                                Загрузка данных...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
             </div>
         </div>
-        
-        <!-- Индикатор подключения SSE -->
-        <div class="sse-status">
-            <div class="sse-indicator" id="sse-indicator"></div>
-            <span style="font-size: 0.875rem; color: var(--color-ink-muted);" id="sse-status">Подключение...</span>
+
+        <!-- ═══ SSE STATUS ═══ -->
+        <div class="sse-bar">
+            <div class="sse-dot" :class="{ 'sse-dot--on': sseConnected, 'sse-dot--off': !sseConnected && sseStatus.includes('Отключено') }"></div>
+            <span class="sse-label">{{ sseStatus }}</span>
         </div>
     </div>
-    
+
     <script>
-        // Хранение всех запросов
-        let allRequests = [];
-        let filteredRequests = [];
-        
-        // Форматирование чисел с разделителями
-        function formatTokens(num) {
-            return num.toLocaleString('ru-RU');  // Полное число с разделителями
-        }
-        
-        // Подсчёт токенов за период
-        function countTokensForPeriod(requests, period) {
-            const now = Date.now() / 1000;
-            const periods = {
-                'today': 86400,  // 24 часа
-                'month': 2592000  // 30 дней
-            };
-            const limit = periods[period];
-            
-            let inputTotal = 0;
-            let outputTotal = 0;
-            
-            requests.forEach(req => {
-                const reqTime = parseDateTime(req.datetime);
-                if (now - reqTime <= limit) {
-                    inputTotal += parseInt(req.input_tokens) || 0;
-                    outputTotal += parseInt(req.output_tokens) || 0;
-                }
-            });
-            
-            return { input: inputTotal, output: outputTotal, total: inputTotal + outputTotal };
-        }
-        
-        // Обновление верхних карточек токенов
-        function updateTokenCards(allRequests) {
-            const today = countTokensForPeriod(allRequests, 'today');
-            const month = countTokensForPeriod(allRequests, 'month');
-            
-            document.getElementById('today-tokens').textContent = today.total.toLocaleString();
-            document.getElementById('today-input').textContent = today.input.toLocaleString();
-            document.getElementById('today-output').textContent = today.output.toLocaleString();
-            
-            document.getElementById('month-tokens').textContent = month.total.toLocaleString();
-            document.getElementById('month-input').textContent = month.input.toLocaleString();
-            document.getElementById('month-output').textContent = month.output.toLocaleString();
-        }
-        
-        // Обновление карточек фильтра
-        function updateFilterTokenCards(filteredRequests) {
-            let inputTotal = 0;
-            let outputTotal = 0;
-            
-            filteredRequests.forEach(req => {
-                inputTotal += parseInt(req.input_tokens) || 0;
-                outputTotal += parseInt(req.output_tokens) || 0;
-            });
-            
-            const total = inputTotal + outputTotal;
-            
-            // Обновление карточек
-            document.getElementById('filter-total-tokens').textContent = 
-                formatTokens(total);
-            
-            document.getElementById('filter-input-total').textContent = 
-                formatTokens(inputTotal);
-            document.getElementById('filter-output-total').textContent = 
-                formatTokens(outputTotal);
-        }
-        
-        // Пресеты фильтров
-        let presets = JSON.parse(localStorage.getItem('dashboard_presets') || '{}');
-        
-        // Debounce для поиска
-        let searchDebounce;
-        
-        // Парсинг даты в timestamp
-        function parseDateTime(datetimeStr) {
-            if (!datetimeStr) return 0;
-            try {
-                // Ожидаем формат "dd.mm.yyyy hh:mm" (из API)
-                const parts = datetimeStr.split(' ');
-                const dateParts = parts[0].split('.');
-                const timeParts = parts[1] ? parts[1].split(':') : ['0', '0'];
-                
-                const day = parseInt(dateParts[0]);
-                const month = parseInt(dateParts[1]) - 1; // JS месяцы с 0
-                const year = parseInt(dateParts[2]);
-                const hour = parseInt(timeParts[0]);
-                const minute = parseInt(timeParts[1]);
-                
-                return Math.floor(new Date(year, month, day, hour, minute).getTime() / 1000);
-            } catch (e) {
-                console.error('parseDateTime error:', e, datetimeStr);
-                return 0;
-            }
-        }
-        
-        // Форматирование времени
-        function formatTime(seconds) {
-            if (seconds <= 0) return "Сейчас";
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = seconds % 60;
-            if (h > 0) return `${h}ч ${m}м`;
-            if (m > 0) return `${m}м ${s}с`;
-            return `${s}с`;
-        }
-        
-        // Форматирование по timestamp (абсолютное время сброса)
-        function formatTimeFromTimestamp(resetAt) {
-            const now = Math.floor(Date.now() / 1000);
-            const seconds = resetAt - now;
-            return formatTime(seconds);
-        }
-        
-        // Обновление таблицы
-        function updateTable(stats) {
-            const tbody = document.getElementById('accounts-table');
-            let active = 0, warning = 0, exhausted = 0;
-            
-            if (stats.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: var(--color-ink-muted); padding: var(--space-xl);">
-                            Нет данных. Сделайте запросы через proxy.
-                        </td>
-                    </tr>
-                `;
-                document.getElementById('total-accounts').textContent = '0';
-                document.getElementById('active-count').textContent = '0';
-                document.getElementById('warning-count').textContent = '0';
-                document.getElementById('exhausted-count').textContent = '0';
-                return;
-            }
-            
-            tbody.innerHTML = stats.map(acc => {
-                const percentage = Math.min(100, (acc.request_count / acc.limit) * 100);
-                const statusClass = acc.status;
-                const rowClass = `row-${acc.status}`;
-                
-                if (acc.status === 'active') active++;
-                else if (acc.status === 'warning') warning++;
-                else exhausted++;
-                
-                // Используем reset_at для локального подсчёта таймера
-                const resetAt = acc.reset_at;
-                
-                return `
-                    <tr class="${rowClass}" data-account-id="${acc.account_id}">
-                        <td style="font-weight: 500;">account_${acc.account_id}</td>
-                        <td>${acc.request_count} / ${acc.limit}</td>
-                        <td>
-                            <div class="progress-track">
-                                <div class="progress-bar ${statusClass}" style="width: ${percentage}%"></div>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="status-badge ${statusClass}">${acc.status}</span>
-                        </td>
-                        <td class="timer-cell"
-                            data-account-id="${acc.account_id}"
-                            data-reset-at="${resetAt || ''}">
-                            ${resetAt ? formatTimeFromTimestamp(resetAt) : '—'}
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-            
-            // Обновление сводки
-            document.getElementById('total-accounts').textContent = stats.length;
-            document.getElementById('active-count').textContent = active;
-            document.getElementById('warning-count').textContent = warning;
-            document.getElementById('exhausted-count').textContent = exhausted;
-        }
-        
-        // Обновление таймеров
-        function updateTimers() {
-            document.querySelectorAll('.timer-cell[data-reset-at]').forEach(el => {
-                const resetAt = el.getAttribute('data-reset-at');
-                if (resetAt && resetAt !== '') {
-                    const seconds = parseInt(resetAt) - Math.floor(Date.now() / 1000);
-                    el.textContent = seconds > 0 ? formatTime(seconds) : 'Сейчас';
-                }
-            });
-        }
-        
-        // Загрузка начальных данных
-        async function loadStats() {
-            try {
-                const response = await fetch('/api/stats');
-                const stats = await response.json();
-                updateTable(stats);
-            } catch (error) {
-                console.error('Ошибка загрузки:', error);
-            }
-        }
-        
-        // Обновление таблицы запросов
-        function updateRequestsTable(requests) {
-            const tbody = document.getElementById('requests-table');
-            
-            if (requests.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: var(--color-ink-muted); padding: var(--space-xl);">
-                            Нет данных о запросах
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            tbody.innerHTML = requests.map(req => {
-                const statusClass = req.status_code === 200 ? 'active' : 
-                                   req.status_code === 429 ? 'exhausted' : 'warning';
-                const rowClass = `row-${statusClass}`;
-                
-                return `
-                    <tr class="${rowClass}">
-                        <td style="font-family: var(--font-mono); font-size: 0.85rem;">${req.datetime}</td>
-                        <td>account_${req.account_id}</td>
-                        <td>${req.model}</td>
-                        <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;">
-                            ${req.input_tokens || '—'} / ${req.output_tokens || '—'}
-                        </td>
-                        <td>
-                            <span class="status-badge ${statusClass}">${req.status_code}</span>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-            
-            // Обновление опций фильтров
-            populateFilterOptions(requests);
-        }
-        
-        // Заполнение опций фильтров (аккаунты и модели) - multi-select
-        function populateFilterOptions(requests) {
-            const accountsContainer = document.getElementById('filter-accounts');
-            const modelsContainer = document.getElementById('filter-models');
-            
-            // Уникальные значения
-            const accounts = [...new Set(requests.map(r => r.account_id))].sort();
-            const models = [...new Set(requests.map(r => r.model))].sort();
-            
-            // Заполнение аккаунтов
-            accountsContainer.innerHTML = accounts.map(acc => `
-                <label><input type="checkbox" value="${acc}" /> account_${acc}</label>
-            `).join('');
-            
-            // Заполнение моделей
-            modelsContainer.innerHTML = models.map(m => `
-                <label><input type="checkbox" value="${m}" /> ${m}</label>
-            `).join('');
-        }
-        
-        // Инициализация обработчиков событий
-        function initFilterHandlers() {
-            // Live поиск с debounce
-            const searchInput = document.getElementById('filter-search');
-            if (searchInput) {
-                searchInput.addEventListener('input', (e) => {
-                    clearTimeout(searchDebounce);
-                    searchDebounce = setTimeout(applyFilters, 300);
+        const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                // ── Data ──
+                const accounts = ref([]);
+                const allRequests = ref([]);
+                const filteredRequests = ref([]);
+                const isFilteringActive = ref(false);
+
+                let eventSource = null;
+                let filterDebounce = null;
+                let timerInterval = null;
+
+                // ── Filters ──
+                const filters = ref({
+                    accounts: [],
+                    models: [],
+                    statuses: [],
+                    period: 'all',
+                    inputMin: '',
+                    inputMax: '',
+                    outputMin: '',
+                    outputMax: '',
+                    dateFrom: '',
+                    dateTo: ''
                 });
-            }
-            
-            // Показ/скрытие кастомного периода
-            const periodSelect = document.getElementById('filter-period');
-            if (periodSelect) {
-                periodSelect.addEventListener('change', (e) => {
-                    const customDiv = document.getElementById('custom-period');
-                    customDiv.classList.toggle('hidden', e.target.value !== 'custom');
+
+                // ── Pagination ──
+                const currentPage = ref(1);
+                const pageSize = ref(50);
+
+                // ── Presets ──
+                const presets = ref(JSON.parse(localStorage.getItem('dashboard_presets') || '{}'));
+
+                // ── Theme ──
+                const isDark = ref(localStorage.getItem('theme') !== 'light');
+                const sseConnected = ref(false);
+                const sseStatus = ref('Подключение...');
+
+                // ── Computed: unique accounts & models ──
+                const uniqueAccounts = computed(() => {
+                    return [...new Set(allRequests.value.map(r => r.account_id))].sort();
                 });
-            }
-        }
-        
-        // Быстрые фильтры
-        function quickFilter(type) {
-            resetFiltersUI();
-            if (type === '429') {
-                const checkbox = document.querySelector('#filter-statuses input[value="429"]');
-                if (checkbox) checkbox.checked = true;
-            } else if (type === 'error') {
-                ['#filter-statuses input[value="429"]', 
-                 '#filter-statuses input[value="500"]',
-                 '#filter-statuses input[value="502"]',
-                 '#filter-statuses input[value="503"]'].forEach(sel => {
-                    const cb = document.querySelector(sel);
-                    if (cb) cb.checked = true;
+
+                const uniqueModels = computed(() => {
+                    return [...new Set(allRequests.value.map(r => r.model))].filter(Boolean).sort();
                 });
-            } else if (type === 'success') {
-                const checkbox = document.querySelector('#filter-statuses input[value="200"]');
-                if (checkbox) checkbox.checked = true;
-            }
-            applyFilters();
-        }
-        
-        // Применение фильтров
-        function applyFilters() {
-            const search = document.getElementById('filter-search').value.toLowerCase();
-            const accounts = getCheckedValues('filter-accounts');
-            const models = getCheckedValues('filter-models');
-            const statuses = getCheckedValues('filter-statuses');
-            const period = document.getElementById('filter-period').value;
-            const inputMin = document.getElementById('filter-input-min').value;
-            const inputMax = document.getElementById('filter-input-max').value;
-            const outputMin = document.getElementById('filter-output-min').value;
-            const outputMax = document.getElementById('filter-output-max').value;
-            
-            filteredRequests = allRequests.filter(req => {
-                // Поиск
-                if (search && !req.account_id.includes(search) && !req.model.toLowerCase().includes(search)) {
-                    return false;
+
+                // ── Computed: status counts ──
+                const activeCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'active').length;
+                });
+
+                const warningCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'warning').length;
+                });
+
+                const exhaustedCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'exhausted').length;
+                });
+
+                // ── Computed: token stats ──
+                const stats = computed(() => {
+                    const today = countTokensForPeriod(allRequests.value, 'today');
+                    const month = countTokensForPeriod(allRequests.value, 'month');
+                    return { today, month };
+                });
+
+                const filteredStats = computed(() => {
+                    let inputTotal = 0;
+                    let outputTotal = 0;
+                    filteredRequests.value.forEach(req => {
+                        inputTotal += parseInt(req.input_tokens) || 0;
+                        outputTotal += parseInt(req.output_tokens) || 0;
+                    });
+                    return { input: inputTotal, output: outputTotal, total: inputTotal + outputTotal };
+                });
+
+                // ── Computed: pagination ──
+                const paginatedRequests = computed(() => {
+                    const start = (currentPage.value - 1) * pageSize.value;
+                    return filteredRequests.value.slice(start, start + pageSize.value);
+                });
+
+                const totalPages = computed(() => {
+                    return Math.ceil(filteredRequests.value.length / pageSize.value) || 1;
+                });
+
+                // ── Pagination methods ──
+                function nextPage() {
+                    if (currentPage.value < totalPages.value) currentPage.value++;
                 }
-                
-                // Мульти-выбор
-                if (accounts.length && !accounts.includes(req.account_id)) return false;
-                if (models.length && !models.includes(req.model)) return false;
-                if (statuses.length && !statuses.includes(req.status_code.toString())) return false;
-                
-                // Период
-                const now = Date.now() / 1000;
-                const periods = { '1h': 3600, '24h': 86400, '7d': 604800 };
-                if (period !== 'all' && period !== 'custom' && period !== 'today' && period !== 'yesterday' && periods[period]) {
-                    const reqTime = parseDateTime(req.datetime);
-                    if (now - reqTime > periods[period]) return false;
+                function prevPage() {
+                    if (currentPage.value > 1) currentPage.value--;
                 }
-                
-                // Сегодня
-                if (period === 'today') {
-                    const reqTime = parseDateTime(req.datetime);
-                    const startOfDay = new Date();
-                    startOfDay.setHours(0, 0, 0, 0);
-                    if (reqTime < startOfDay.getTime() / 1000) return false;
+                function goToPage(page) {
+                    currentPage.value = page;
                 }
-                
-                // Вчера
-                if (period === 'yesterday') {
-                    const reqTime = parseDateTime(req.datetime);
-                    const startOfDay = new Date();
-                    startOfDay.setDate(startOfDay.getDate() - 1);
-                    startOfDay.setHours(0, 0, 0, 0);
-                    const endOfDay = new Date(startOfDay);
-                    endOfDay.setHours(23, 59, 59, 999);
-                    if (reqTime < startOfDay.getTime() / 1000 || reqTime > endOfDay.getTime() / 1000) return false;
+
+                // ── Formatting ──
+                function formatTokens(num) {
+                    return num.toLocaleString('ru-RU');
                 }
-                
-                // Кастомный период
-                if (period === 'custom') {
-                    const from = new Date(document.getElementById('filter-date-from').value).getTime() / 1000;
-                    const to = new Date(document.getElementById('filter-date-to').value).getTime() / 1000;
-                    const reqTime = parseDateTime(req.datetime);
-                    if (reqTime < from || reqTime > to) return false;
+
+                function countTokensForPeriod(requests, period) {
+                    const now = new Date();
+                    let inputTotal = 0;
+                    let outputTotal = 0;
+
+                    requests.forEach(req => {
+                        const reqTime = parseDateTime(req.datetime);
+                        if (!reqTime) return;
+
+                        let match = false;
+
+                        if (period === 'today') {
+                            // Сегодня = те же сутки UTC (00:00 UTC — 23:59 UTC)
+                            const todayStart = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+                            match = reqTime >= todayStart;
+                        } else if (period === 'month') {
+                            // За 30 дней от сейчас
+                            const monthAgo = Math.floor(Date.now() / 1000) - 2592000;
+                            match = reqTime >= monthAgo;
+                        }
+
+                        if (match) {
+                            inputTotal += parseInt(req.input_tokens) || 0;
+                            outputTotal += parseInt(req.output_tokens) || 0;
+                        }
+                    });
+                    return { input: inputTotal, output: outputTotal, total: inputTotal + outputTotal };
                 }
-                
-                // Токены
-                if (inputMin && req.input_tokens < parseInt(inputMin)) return false;
-                if (inputMax && req.input_tokens > parseInt(inputMax)) return false;
-                if (outputMin && req.output_tokens < parseInt(outputMin)) return false;
-                if (outputMax && req.output_tokens > parseInt(outputMax)) return false;
-                
-                return true;
-            });
-            
-            updateRequestsTableDisplay(filteredRequests);
-            updateFilterTokenCards(filteredRequests);  // Обновить карточки фильтра
-        }
-        
-        // Сброс фильтров
-        function resetFilters() {
-            resetFiltersUI();
-            filteredRequests = allRequests;
-            applyFilters();
-        }
-        
-        // Сброс UI фильтров
-        function resetFiltersUI() {
-            document.getElementById('filter-search').value = '';
-            document.getElementById('filter-period').value = 'all';
-            document.getElementById('custom-period').classList.add('hidden');
-            document.getElementById('filter-input-min').value = '';
-            document.getElementById('filter-input-max').value = '';
-            document.getElementById('filter-output-min').value = '';
-            document.getElementById('filter-output-max').value = '';
-            
-            // Снять все чекбоксы
-            document.querySelectorAll('#filter-accounts input[type=checkbox]').forEach(cb => cb.checked = false);
-            document.querySelectorAll('#filter-models input[type=checkbox]').forEach(cb => cb.checked = false);
-            document.querySelectorAll('#filter-statuses input[type=checkbox]').forEach(cb => cb.checked = false);
-        }
-        
-        // Сохранение пресета
-        function savePreset() {
-            const name = prompt('Название пресета:');
-            if (!name) return;
-            
-            presets[name] = {
-                accounts: getCheckedValues('filter-accounts'),
-                models: getCheckedValues('filter-models'),
-                statuses: getCheckedValues('filter-statuses'),
-                period: document.getElementById('filter-period').value,
-                search: document.getElementById('filter-search').value,
-                inputMin: document.getElementById('filter-input-min').value,
-                inputMax: document.getElementById('filter-input-max').value,
-                outputMin: document.getElementById('filter-output-min').value,
-                outputMax: document.getElementById('filter-output-max').value,
-            };
-            
-            localStorage.setItem('dashboard_presets', JSON.stringify(presets));
-            renderPresets();
-        }
-        
-        // Загрузка пресета
-        function loadPreset(name) {
-            const preset = presets[name];
-            if (!preset) return;
-            
-            setCheckedValues('filter-accounts', preset.accounts || []);
-            setCheckedValues('filter-models', preset.models || []);
-            setCheckedValues('filter-statuses', preset.statuses || []);
-            document.getElementById('filter-period').value = preset.period || 'all';
-            document.getElementById('filter-search').value = preset.search || '';
-            document.getElementById('filter-input-min').value = preset.inputMin || '';
-            document.getElementById('filter-input-max').value = preset.inputMax || '';
-            document.getElementById('filter-output-min').value = preset.outputMin || '';
-            document.getElementById('filter-output-max').value = preset.outputMax || '';
-            
-            // Показать/скрыть кастомный период
-            const customDiv = document.getElementById('custom-period');
-            if (preset.period === 'custom') {
-                customDiv.classList.remove('hidden');
-            } else {
-                customDiv.classList.add('hidden');
-            }
-            
-            applyFilters();
-        }
-        
-        // Удаление пресета
-        function deletePreset(name) {
-            if (!confirm(`Удалить пресет "${name}"?`)) return;
-            delete presets[name];
-            localStorage.setItem('dashboard_presets', JSON.stringify(presets));
-            renderPresets();
-        }
-        
-        // Рендер пресетов
-        function renderPresets() {
-            const container = document.getElementById('presets-list');
-            container.innerHTML = Object.keys(presets).map(name => `
-                <button onclick="loadPreset('${name}')">${name}</button>
-                <button onclick="deletePreset('${name}')" class="delete-btn">✕</button>
-            `).join('');
-        }
-        
-        // Утилиты
-        function getCheckedValues(containerId) {
-            return Array.from(document.querySelectorAll(`#${containerId} input:checked`))
-                .map(el => el.value);
-        }
-        
-        function setCheckedValues(containerId, values) {
-            document.querySelectorAll(`#${containerId} input[type=checkbox]`).forEach(cb => {
-                cb.checked = values.includes(cb.value);
-            });
-        }
-        
-        // Отображение таблицы запросов (без обновления опций фильтров)
-        function updateRequestsTableDisplay(requests) {
-            const tbody = document.getElementById('requests-table');
-            
-            if (requests.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: var(--color-ink-muted); padding: var(--space-xl);">
-                            Нет данных о запросах
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            tbody.innerHTML = requests.map(req => {
-                const statusClass = req.status_code === 200 ? 'active' : 
-                                   req.status_code === 429 ? 'exhausted' : 'warning';
-                const rowClass = `row-${statusClass}`;
-                
-                return `
-                    <tr class="${rowClass}">
-                        <td style="font-family: var(--font-mono); font-size: 0.85rem;">${req.datetime}</td>
-                        <td>account_${req.account_id}</td>
-                        <td>${req.model}</td>
-                        <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;">
-                            ${req.input_tokens || '—'} / ${req.output_tokens || '—'}
-                        </td>
-                        <td>
-                            <span class="status-badge ${statusClass}">${req.status_code}</span>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-        
-        // SSE подключение
-        function connectSSE() {
-            const indicator = document.getElementById('sse-indicator');
-            const status = document.getElementById('sse-status');
-            
-            const eventSource = new EventSource('/sse/stats');
-            
-            eventSource.onopen = () => {
-                indicator.className = 'sse-indicator connected';
-                status.textContent = 'Подключено (real-time)';
-            };
-            
-            eventSource.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                const stats = data.stats || data;
-                const requests = data.requests || [];
-                
-                // Сохраняем все запросы
-                allRequests = requests;
-                
-                // Если фильтры не применены, показываем все
-                if (filteredRequests.length === 0 || filteredRequests === allRequests) {
-                    filteredRequests = allRequests;
-                    updateRequestsTable(filteredRequests);
-                } else {
-                    // Применяем текущие фильтры к новым данным
+
+                function parseDateTime(datetimeStr) {
+                    if (!datetimeStr) return 0;
+                    try {
+                        const parts = datetimeStr.split(' ');
+                        const dateParts = parts[0].split('.');
+                        const timeParts = parts[1] ? parts[1].split(':') : ['0', '0'];
+                        const day = parseInt(dateParts[0]);
+                        const month = parseInt(dateParts[1]) - 1;
+                        const year = parseInt(dateParts[2]);
+                        const hour = parseInt(timeParts[0]);
+                        const minute = parseInt(timeParts[1]);
+                        return Math.floor(new Date(year, month, day, hour, minute).getTime() / 1000);
+                    } catch (e) {
+                        console.error('parseDateTime error:', e, datetimeStr);
+                        return 0;
+                    }
+                }
+
+                function formatTime(seconds) {
+                    if (seconds <= 0) return "Сейчас";
+                    const h = Math.floor(seconds / 3600);
+                    const m = Math.floor((seconds % 3600) / 60);
+                    const s = seconds % 60;
+                    if (h > 0) return `${h}ч ${m}м`;
+                    if (m > 0) return `${m}м ${s}с`;
+                    return `${s}с`;
+                }
+
+                function formatResetTime(resetAt) {
+                    if (!resetAt) return '—';
+                    const now = Math.floor(Date.now() / 1000);
+                    const seconds = parseInt(resetAt) - now;
+                    return seconds > 0 ? formatTime(seconds) : 'Сейчас';
+                }
+
+                function percentage(current, limit) {
+                    return Math.min(100, (current / limit) * 100);
+                }
+
+                function getRowClass(statusCode) {
+                    if (statusCode === 200) return 'row-active';
+                    if (statusCode === 429) return 'row-exhausted';
+                    return 'row-warning';
+                }
+
+                function getStatusClass(statusCode) {
+                    if (statusCode === 200) return 'active';
+                    if (statusCode === 429) return 'exhausted';
+                    return 'warning';
+                }
+
+                // ── Filters ──
+                function applyFilters() {
+                    const f = filters.value;
+                    currentPage.value = 1;
+                    isFilteringActive.value = !!(
+                        f.accounts.length || f.models.length || f.statuses.length ||
+                        f.period !== 'all' || f.inputMin || f.inputMax || f.outputMin || f.outputMax
+                    );
+                    filteredRequests.value = allRequests.value.filter(req => {
+                        if (f.accounts.length && !f.accounts.includes(req.account_id)) return false;
+                        if (f.models.length && !f.models.includes(req.model)) return false;
+                        if (f.statuses.length && !f.statuses.includes(req.status_code.toString())) return false;
+
+                        const now = Date.now() / 1000;
+                        const periods = { '1h': 3600, '24h': 86400, '7d': 604800 };
+                        if (f.period !== 'all' && f.period !== 'custom' && f.period !== 'today' && f.period !== 'yesterday' && periods[f.period]) {
+                            const reqTime = parseDateTime(req.datetime);
+                            if (now - reqTime > periods[f.period]) return false;
+                        }
+
+                        if (f.period === 'today') {
+                            const reqTime = parseDateTime(req.datetime);
+                            const now = new Date();
+                            const todayStart = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+                            if (reqTime < todayStart) return false;
+                        }
+
+                        if (f.period === 'yesterday') {
+                            const reqTime = parseDateTime(req.datetime);
+                            const now = new Date();
+                            const yesterdayStart = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1) / 1000);
+                            const yesterdayEnd = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+                            if (reqTime < yesterdayStart || reqTime >= yesterdayEnd) return false;
+                        }
+
+                        if (f.period === 'custom') {
+                            const reqTime = parseDateTime(req.datetime);
+                            if (!reqTime) return false;
+
+                            if (f.dateFrom) {
+                                const from = new Date(f.dateFrom).getTime() / 1000;
+                                if (!isNaN(from) && reqTime < from) return false;
+                            }
+                            if (f.dateTo) {
+                                const to = new Date(f.dateTo).getTime() / 1000 + 59;
+                                if (!isNaN(to) && reqTime > to) return false;
+                            }
+                        }
+
+                        if (f.inputMin && req.input_tokens < parseInt(f.inputMin)) return false;
+                        if (f.inputMax && req.input_tokens > parseInt(f.inputMax)) return false;
+                        if (f.outputMin && req.output_tokens < parseInt(f.outputMin)) return false;
+                        if (f.outputMax && req.output_tokens > parseInt(f.outputMax)) return false;
+
+                        return true;
+                    });
+                }
+
+                function scheduleApplyFilters() {
+                    clearTimeout(filterDebounce);
+                    filterDebounce = setTimeout(applyFilters, 200);
+                }
+
+                function resetFilters() {
+                    filters.value = {
+                        accounts: [],
+                        models: [],
+                        statuses: [],
+                        period: 'all',
+                        inputMin: '',
+                        inputMax: '',
+                        outputMin: '',
+                        outputMax: '',
+                        dateFrom: '',
+                        dateTo: ''
+                    };
+                    isFilteringActive.value = false;
+                    currentPage.value = 1;
+                    filteredRequests.value = allRequests.value;
+                }
+
+                function quickFilter(type) {
+                    resetFilters();
+                    if (type === '429') {
+                        filters.value.statuses = ['429'];
+                    } else if (type === 'error') {
+                        filters.value.statuses = ['429', '500', '502', '503'];
+                    } else if (type === 'success') {
+                        filters.value.statuses = ['200'];
+                    }
                     applyFilters();
                 }
-                
-                updateTable(stats);
-                updateTokenCards(allRequests);  // Обновить карточки токенов (всегда)
-                updateFilterTokenCards(filteredRequests);  // Обновить карточки фильтра
-                // Сразу обновить таймеры после пересоздания таблицы
-                updateTimers();
-            };
-            
-            eventSource.onerror = () => {
-                indicator.className = 'sse-indicator disconnected';
-                status.textContent = 'Отключено (перезагрузка страницы)';
-                eventSource.close();
-                // Попытка переподключения через 5 секунд
-                setTimeout(connectSSE, 5000);
-            };
-            
-            return eventSource;
-        }
-        
-        // === THEME TOGGLE ===
-        function initTheme() {
-            const saved = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', saved);
-            updateThemeIcon(saved);
-        }
-        
-        function updateThemeIcon(theme) {
-            const btn = document.getElementById('theme-toggle');
-            if (!btn) return;
-            btn.classList.toggle('dark', theme === 'dark');
-            btn.setAttribute('aria-label', `Переключить на ${theme === 'dark' ? 'светлую' : 'темную'} тему`);
-        }
-        
-        // === INITIALIZATION ===
-        document.addEventListener('DOMContentLoaded', () => {
-            initTheme();
-            loadStats();
-            connectSSE();
-            initFilterHandlers();
-            renderPresets();
-            // Обновление таймеров каждую секунду
-            setInterval(updateTimers, 1000);
-        });
-        
-        // Theme toggle event listener
-        document.getElementById('theme-toggle')?.addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme');
-            const next = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
-            updateThemeIcon(next);
-        });
+
+                // ── Presets ──
+                function savePreset() {
+                    const name = prompt('Название пресета:');
+                    if (!name) return;
+                    presets.value[name] = { ...filters.value };
+                    localStorage.setItem('dashboard_presets', JSON.stringify(presets.value));
+                }
+
+                function loadPreset(name) {
+                    const preset = presets.value[name];
+                    if (!preset) return;
+                    filters.value = { ...preset };
+                    applyFilters();
+                }
+
+                function deletePreset(name) {
+                    if (!confirm(`Удалить пресет "${name}"?`)) return;
+                    delete presets.value[name];
+                    localStorage.setItem('dashboard_presets', JSON.stringify(presets.value));
+                }
+
+                // ── Theme ──
+                function toggleTheme() {
+                    isDark.value = !isDark.value;
+                    document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light');
+                    localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+                }
+
+                function initTheme() {
+                    const saved = localStorage.getItem('theme') || 'dark';
+                    isDark.value = saved === 'dark';
+                    document.documentElement.setAttribute('data-theme', saved);
+                }
+
+                // ── Data update ──
+                function updateRequests(newRequests) {
+                    if (!newRequests || newRequests.length === 0) return;
+                    allRequests.value = newRequests;
+                }
+
+                // ── SSE ──
+                function connectSSE() {
+                    eventSource = new EventSource('/sse/stats');
+                    eventSource.onopen = () => {
+                        sseConnected.value = true;
+                        sseStatus.value = 'Подключено (real-time)';
+                    };
+                    eventSource.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        const statsData = data.stats || data;
+                        const requests = data.requests || [];
+                        accounts.value = statsData;
+                        updateRequests(requests);
+                        if (!isFilteringActive.value) {
+                            filteredRequests.value = allRequests.value;
+                        }
+                    };
+                    eventSource.onerror = () => {
+                        sseConnected.value = false;
+                        sseStatus.value = 'Отключено (перезагрузка страницы)';
+                        eventSource.close();
+                        setTimeout(connectSSE, 5000);
+                    };
+                }
+
+                // ── Timers ──
+                function updateTimers() {
+                    document.querySelectorAll('.timer-cell[data-reset-at]').forEach(el => {
+                        const resetAt = el.getAttribute('data-reset-at');
+                        if (resetAt && resetAt !== '') {
+                            const seconds = parseInt(resetAt) - Math.floor(Date.now() / 1000);
+                            el.textContent = seconds > 0 ? formatTime(seconds) : 'Сейчас';
+                        }
+                    });
+                }
+
+                // ── Watchers ──
+                watch(() => filters.value.accounts, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.models, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.statuses, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.period, scheduleApplyFilters);
+                watch(() => filters.value.inputMin, scheduleApplyFilters);
+                watch(() => filters.value.inputMax, scheduleApplyFilters);
+                watch(() => filters.value.outputMin, scheduleApplyFilters);
+                watch(() => filters.value.outputMax, scheduleApplyFilters);
+
+                // ── Lifecycle ──
+                onMounted(() => {
+                    initTheme();
+                    connectSSE();
+                    timerInterval = setInterval(updateTimers, 1000);
+                });
+
+                onUnmounted(() => {
+                    if (eventSource) eventSource.close();
+                    if (timerInterval) clearInterval(timerInterval);
+                    clearTimeout(filterDebounce);
+                });
+
+                return {
+                    accounts,
+                    allRequests,
+                    filteredRequests,
+                    filters,
+                    presets,
+                    isDark,
+                    sseConnected,
+                    sseStatus,
+                    uniqueAccounts,
+                    uniqueModels,
+                    activeCount,
+                    warningCount,
+                    exhaustedCount,
+                    stats,
+                    filteredStats,
+                    currentPage,
+                    pageSize,
+                    paginatedRequests,
+                    totalPages,
+                    nextPage,
+                    prevPage,
+                    goToPage,
+                    formatTokens,
+                    formatTime,
+                    formatResetTime,
+                    percentage,
+                    getRowClass,
+                    getStatusClass,
+                    applyFilters,
+                    resetFilters,
+                    quickFilter,
+                    savePreset,
+                    loadPreset,
+                    deletePreset,
+                    toggleTheme
+                };
+            }
+        }).mount('#app');
     </script>
 </body>
 </html>

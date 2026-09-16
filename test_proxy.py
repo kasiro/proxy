@@ -18,7 +18,7 @@ DEBUG_MODE = os.environ.get("PROXY_DEBUG", "0") == "1"
 
 # Импорт клиента статистики
 try:
-    from stats_client import record_request_async, init_db, init_accounts
+    from stats_client import record_request, record_request_async, init_db, init_accounts, is_account_available, check_daily_reset
     STATS_ENABLED = True
 except ImportError:
     STATS_ENABLED = False
@@ -118,20 +118,51 @@ if STATS_ENABLED:
     init_db()  # type: ignore
     # Инициализируем БД реальными аккаунтами (добавит отсутствующие с request_count=0)
     init_accounts(ACCOUNT_IDS)  # type: ignore
+    check_daily_reset()  # type: ignore
     print(f"[stats] БД статистики инициализирована: {len(ACCOUNT_IDS)} аккаунтов")
 
+    # Найти первый доступный аккаунт
+    for i, acc_id in enumerate(ACCOUNT_IDS):
+        if is_account_available(acc_id):  # type: ignore
+            current_acc_index = i
+            print(f"[stats] Начинаем с аккаунта {i+1} (account_{acc_id})")
+            break
+    else:
+        print("[stats] Все аккаунты исчерпаны, начинаем с первого")
 
-def switch_account():
-    """Циклически переключает аккаунт, обновляет session.headers и session.cookies."""
-    global current_acc_index
-    current_acc_index = (current_acc_index + 1) % len(ACCOUNTS)
+    # Обновить session для выбранного аккаунта
     parsed = curl_to_python(ACCOUNTS[current_acc_index])
+    TARGET_URL = parsed['url']
     session.headers.clear()
     session.cookies.clear()
     session.headers.update(parsed['headers'])
     session.cookies.update(parsed['cookies'])
-    # [retry] логи — всегда на консоль
-    print(f"[retry] Переключён на аккаунт {current_acc_index + 1}/{len(ACCOUNTS)}", flush=True)
+
+
+def switch_account():
+    """Переключает на следующий доступный аккаунт (пропускает исчерпанные)."""
+    global current_acc_index
+    start = current_acc_index
+
+    for _ in range(len(ACCOUNTS)):
+        current_acc_index = (current_acc_index + 1) % len(ACCOUNTS)
+        acc_id = ACCOUNT_IDS[current_acc_index]
+
+        if STATS_ENABLED:
+            if not is_account_available(acc_id):  # type: ignore
+                continue  # Пропускать исчерпанный
+
+        # Нашли доступный — обновляем session
+        parsed = curl_to_python(ACCOUNTS[current_acc_index])
+        session.headers.clear()
+        session.cookies.clear()
+        session.headers.update(parsed['headers'])
+        session.cookies.update(parsed['cookies'])
+        print(f"[retry] Переключён на аккаунт {current_acc_index + 1}/{len(ACCOUNTS)} (account_{acc_id})", flush=True)
+        return
+
+    # Все исчерпаны
+    print("[retry] Все аккаунты исчерпаны", flush=True)
 
 
 def format_tools_for_prompt(tools: list) -> str:
@@ -271,7 +302,7 @@ async def proxy(request: Request):
     account_id = get_current_account_id()
     
     for attempt in range(len(ACCOUNTS)):
-        resp = session.post(TARGET_URL, json=payload, stream=True)
+        resp = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True))
         
         if resp.status_code == 429:
             print(f"[retry] Аккаунт {current_acc_index + 1} вернул 429 (попытка {attempt + 1}/{len(ACCOUNTS)})")
@@ -355,7 +386,11 @@ async def proxy(request: Request):
             
             # Запись статистики после завершения потока
             if STATS_ENABLED:
-                asyncio.run(record_request_async(account_id, 200, model, usage_data['input_tokens'], usage_data['output_tokens']))  # type: ignore
+                threading.Thread(
+                    target=record_request,
+                    args=(account_id, 200, model, usage_data['input_tokens'], usage_data['output_tokens']),
+                    daemon=True
+                ).start()
 
         return StreamingResponse(
             stream_generator(),
@@ -365,40 +400,39 @@ async def proxy(request: Request):
     else:
         # Если стриминг выключен – возвращаем обычный JSON, но преобразуем
         raw_response = resp.text # type: ignore
+        data = None
         try:
             data = json.loads(raw_response)
             # Извлекаем токены из non-stream ответа
             usage = data.get('usage', {})
             output_tokens = usage.get('completion_tokens', 0) or usage.get('output_tokens', 0)
             input_tokens = usage.get('prompt_tokens', input_tokens) or usage.get('input_tokens', input_tokens)
-            
-            # Запись статистики
-            if STATS_ENABLED:
-                await record_request_async(account_id, 200, model, input_tokens, output_tokens)  # type: ignore
-            
-            # Проверяем, есть ли в ответе поле tool_calls (в формате OpenAI)
-            if 'choices' in data and data['choices']:
-                message = data['choices'][0].get('message', {})
-                if 'tool_calls' in message:
-                    # Уже в нужном формате, просто возвращаем
-                    return Response(content=raw_response, status_code=resp.status_code) # type: ignore
-                # Иначе, возможно, модель вернула текст с вызовом в виде тегов
-                content = message.get('content', '')
-                content = strip_think_tags(content)
-                message['content'] = content
-                # Попробуем найти JSON внутри текста (например, {"tool_calls": ...})
-                # Можно использовать регулярное выражение
-                match = re.search(r'(\{"tool_calls":\s*\[.*?\])', content, re.DOTALL)
-                if match:
-                    tool_call_json = match.group(1)
-                    # Заменяем content на этот JSON и добавляем tool_calls в message
-                    new_message = message.copy()
-                    new_message['content'] = None  # или убираем
-                    new_message['tool_calls'] = json.loads(tool_call_json)['tool_calls']
-                    data['choices'][0]['message'] = new_message
-                    return Response(content=json.dumps(data), status_code=resp.status_code) # type: ignore
         except json.JSONDecodeError:
             pass
+
+        # Запись статистики ВНЕ try/except — вызывается ВСЕГДА
+        if STATS_ENABLED:
+            await record_request_async(account_id, 200, model, input_tokens, output_tokens)  # type: ignore
+
+        if data and 'choices' in data and data['choices']:
+            message = data['choices'][0].get('message', {})
+            if 'tool_calls' in message:
+                # Уже в нужном формате, просто возвращаем
+                return Response(content=raw_response, status_code=resp.status_code) # type: ignore
+            # Иначе, возможно, модель вернула текст с вызовом в виде тегов
+            content = message.get('content', '')
+            content = strip_think_tags(content)
+            message['content'] = content
+            # Попробуем найти JSON внутри текста (например, {"tool_calls": ...})
+            match = re.search(r'(\{"tool_calls":\s*\[.*?\])', content, re.DOTALL)
+            if match:
+                tool_call_json = match.group(1)
+                # Заменяем content на этот JSON и добавляем tool_calls в message
+                new_message = message.copy()
+                new_message['content'] = None  # или убираем
+                new_message['tool_calls'] = json.loads(tool_call_json)['tool_calls']
+                data['choices'][0]['message'] = new_message
+                return Response(content=json.dumps(data), status_code=resp.status_code) # type: ignore
         # Если ничего не нашли, возвращаем как есть
         return Response(content=raw_response, status_code=resp.status_code) # type: ignore
 

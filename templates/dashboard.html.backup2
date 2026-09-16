@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenRouter Dashboard</title>
+    <!--
+    УЛУЧШЕННЫЕ ФИЛЬТРЫ ДЛЯ ИСТОРИИ ЗАПРОСОВ:
+    1. Мульти-выбор (checkboxes) для аккаунтов, моделей, статусов
+    2. Поиск с live-фильтрацией (debounce 300мс)
+    3. Кастомный период (date picker) + пресеты (Сегодня, Вчера)
+    4. Фильтр по токенам (input/output от и до)
+    5. Пресеты фильтров (сохранение в localStorage)
+    6. Быстрые фильтры (Только 429, Только ошибки, Только успехи)
+    -->
+    <!-- Hallmark · pre-emit critique: P4 H5 E4 S4 R5 V5 -->
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        /* === DESIGN TOKENS === */
+        :root {
+            /* Typography */
+            --font-display: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+            --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            
+            /* Color palette - OKLCH with tint toward anchor hue (blue) - Light theme (default) */
+            --color-paper: oklch(98% 0.01 240);
+            --color-paper-2: oklch(96% 0.015 240);
+            --color-paper-3: oklch(94% 0.02 240);
+            --color-ink: oklch(20% 0.02 240);
+            --color-ink-muted: oklch(45% 0.02 240);
+            --color-border: oklch(85% 0.02 240);
+            
+            /* Status colors - named tokens, no inline hex */
+            --color-success: oklch(65% 0.18 140);
+            --color-success-bg: oklch(95% 0.04 140);
+            --color-success-ink: oklch(25% 0.08 140);
+            --color-warning: oklch(75% 0.15 85);
+            --color-warning-bg: oklch(96% 0.05 85);
+            --color-warning-ink: oklch(30% 0.1 85);
+            --color-error: oklch(60% 0.2 25);
+            --color-error-bg: oklch(95% 0.05 25);
+            --color-error-ink: oklch(25% 0.08 25);
+            
+            /* Accent - blue anchor */
+            --color-accent: oklch(55% 0.2 250);
+            --color-accent-hover: oklch(50% 0.22 250);
+            --color-accent-active: oklch(45% 0.24 250);
+            --color-accent-bg: oklch(95% 0.05 250);
+            --color-accent-ink: oklch(98% 0.01 250);
+            
+            /* Metrics */
+            --color-metric-input: oklch(65% 0.18 140);
+            --color-metric-output: oklch(65% 0.18 30);
+            --color-metric-total: oklch(60% 0.2 250);
+            
+            /* Spacing scale - 4pt grid */
+            --space-xs: 0.25rem;   /* 4px */
+            --space-sm: 0.5rem;    /* 8px */
+            --space-md: 1rem;      /* 16px */
+            --space-lg: 1.5rem;    /* 24px */
+            --space-xl: 2rem;      /* 32px */
+            --space-2xl: 3rem;     /* 48px */
+            
+            /* Motion */
+            --dur-short: 150ms;
+            --dur-med: 250ms;
+            --ease-out: cubic-bezier(0.33, 0.85, 0.4, 0.96);
+            --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+            
+            /* Focus */
+            --color-focus: oklch(55% 0.2 250);
+            --focus-ring: 2px solid var(--color-focus);
+            --focus-offset: 2px;
+        }
+        
+        /* Dark theme */
+        [data-theme="dark"] {
+            --color-paper: oklch(15% 0.02 240);
+            --color-paper-2: oklch(20% 0.02 240);
+            --color-paper-3: oklch(25% 0.02 240);
+            --color-ink: oklch(95% 0.01 240);
+            --color-ink-muted: oklch(70% 0.02 240);
+            --color-border: oklch(30% 0.02 240);
+            
+            /* Status colors - adjusted for dark theme */
+            --color-success: oklch(70% 0.18 140);
+            --color-success-bg: oklch(20% 0.04 140);
+            --color-success-ink: oklch(85% 0.08 140);
+            --color-warning: oklch(80% 0.15 85);
+            --color-warning-bg: oklch(25% 0.05 85);
+            --color-warning-ink: oklch(90% 0.1 85);
+            --color-error: oklch(70% 0.2 25);
+            --color-error-bg: oklch(22% 0.05 25);
+            --color-error-ink: oklch(85% 0.08 25);
+            
+            /* Accent - blue anchor */
+            --color-accent: oklch(65% 0.2 250);
+            --color-accent-hover: oklch(70% 0.22 250);
+            --color-accent-active: oklch(60% 0.24 250);
+            --color-accent-bg: oklch(25% 0.05 250);
+            --color-accent-ink: oklch(15% 0.01 250);
+            
+            /* Metrics */
+            --color-metric-input: oklch(70% 0.18 140);
+            --color-metric-output: oklch(70% 0.18 30);
+            --color-metric-total: oklch(65% 0.2 250);
+            
+            /* Focus */
+            --color-focus: oklch(65% 0.2 250);
+        }
+        
+        /* Theme toggle button */
+        .theme-toggle-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid var(--color-border);
+            background: var(--color-paper);
+            color: var(--color-ink);
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            transition: background-color var(--dur-short) var(--ease-out),
+                        border-color var(--dur-short) var(--ease-out);
+            position: relative;
+        }
+        
+        .theme-toggle-btn:hover {
+            background: var(--color-border);
+        }
+        
+        .theme-toggle-btn:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+        
+        .theme-toggle-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .sun-icon { display: none; }
+        .moon-icon { display: block; }
+        
+        .theme-toggle-btn.dark .sun-icon { display: block; }
+        .theme-toggle-btn.dark .moon-icon { display: none; }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* === BASE === */
+        html {
+            overflow-x: clip;
+            font-family: var(--font-body);
+            font-size: 16px;
+            line-height: 1.55;
+            color: var(--color-ink);
+            background: var(--color-paper);
+        }
+        
+        body {
+            margin: 0;
+            min-height: 100vh;
+            overflow-x: clip;
+        }
+        
+        /* === TYPOGRAPHY === */
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            line-height: 1.1;
+            margin: 0 0 var(--space-md);
+            font-style: normal;
+        }
+        
+        h1 { font-size: clamp(1.5rem, 4vw, 2rem); }
+        h2 { font-size: clamp(1.25rem, 3vw, 1.5rem); }
+        
+        .subtitle {
+            color: var(--color-ink-muted);
+            font-size: 0.95rem;
+            margin-bottom: var(--space-xl);
+        }
+        
+        /* === LAYOUT === */
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--space-xl);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: var(--space-md);
+            }
+        }
+        
+        /* === CARDS === */
+        .card {
+            background: var(--color-paper-2);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: var(--space-lg);
+            transition: background-color var(--dur-short) var(--ease-out),
+                        border-color var(--dur-short) var(--ease-out);
+        }
+        
+        .card:hover {
+            border-color: var(--color-accent);
+        }
+        
+        /* === STATS GRID - Asymmetric, not 4 equal columns === */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+            gap: var(--space-lg);
+            margin-bottom: var(--space-xl);
+        }
+        
+        .stat-card {
+            background: var(--color-paper);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: var(--space-lg);
+            transition: transform var(--dur-short) var(--ease-out),
+                        border-color var(--dur-short) var(--ease-out),
+                        background-color var(--dur-short) var(--ease-out);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--color-accent);
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--color-ink-muted);
+            margin-bottom: var(--space-xs);
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: var(--font-display);
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .stat-value.success { color: var(--color-success); }
+        .stat-value.warning { color: var(--color-warning); }
+        .stat-value.error { color: var(--color-error); }
+        .stat-value.metric { color: var(--color-metric-total); }
+        
+        .stat-detail {
+            font-size: 0.8rem;
+            color: var(--color-ink-muted);
+            margin-top: var(--space-xs);
+            font-variant-numeric: tabular-nums;
+        }
+        
+        /* === STATUS BADGES === */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        
+        .status-badge.active {
+            background: var(--color-success-bg);
+            color: var(--color-success-ink);
+        }
+        
+        .status-badge.warning {
+            background: var(--color-warning-bg);
+            color: var(--color-warning-ink);
+        }
+        
+        .status-badge.exhausted {
+            background: var(--color-error-bg);
+            color: var(--color-error-ink);
+        }
+        
+        /* === PROGRESS BAR === */
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            background: var(--color-paper-3);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width var(--dur-med) var(--ease-out);
+        }
+        
+        .progress-bar.active { background: var(--color-success); }
+        .progress-bar.warning { background: var(--color-warning); }
+        .progress-bar.exhausted { background: var(--color-error); }
+        
+        /* === ROW BACKGROUNDS === */
+        .row-active { background: var(--color-success-bg); }
+        .row-warning { background: var(--color-warning-bg); }
+        .row-exhausted { background: var(--color-error-bg); }
+        
+        /* === TABLES === */
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            margin-bottom: var(--space-xl);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        
+        thead {
+            background: var(--color-paper-3);
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        th {
+            text-align: left;
+            padding: var(--space-md) var(--space-lg);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-ink-muted);
+        }
+        
+        td {
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--color-border);
+            vertical-align: middle;
+        }
+        
+        tbody tr:hover {
+            background: var(--color-paper-3);
+        }
+        
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* === FILTERS PANEL === */
+        .filters-panel {
+            background: var(--color-paper-2);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: var(--space-lg);
+            margin: 0 0 var(--space-lg);
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+            gap: var(--space-md);
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .filter-group:not(:last-child) {
+            margin-bottom: var(--space-md);
+        }
+        
+        .filter-group label {
+            font-size: 0.875rem;
+            color: var(--color-ink-muted);
+            margin-bottom: var(--space-xs);
+        }
+        
+        .filter-group input[type="text"],
+        .filter-group input[type="number"],
+        .filter-group input[type="datetime-local"],
+        .filter-group select {
+            padding: var(--space-xs) var(--space-sm);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-family: var(--font-body);
+            color: var(--color-ink);
+            background: var(--color-paper);
+            transition: border-color var(--dur-short) var(--ease-out),
+                        box-shadow var(--dur-short) var(--ease-out);
+            min-height: 33px;
+        }
+        
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+            border-color: var(--color-focus);
+        }
+        
+        .multi-select {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            padding: var(--space-xs);
+            background: var(--color-paper);
+            transition: background-color var(--dur-short) var(--ease-out),
+                        border-color var(--dur-short) var(--ease-out);
+        }
+        
+        .multi-select label {
+            display: block;
+            padding: var(--space-xs);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color var(--dur-short) var(--ease-out);
+        }
+        
+        .multi-select label:hover {
+            background: var(--color-paper-2);
+        }
+        
+        /* Группа с токенами — занимает всю ширину */
+        .filter-group:has(.token-filter) {
+            grid-column: 1 / -1;
+            margin-bottom: var(--space-md);
+        }
+
+        /* Контейнер полей внутри группы */
+        .token-filter {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: var(--space-lg);
+        }
+        
+        /* Поля — 100% ширины контейнера */
+        .token-filter input {
+            min-width: 0;
+            width: 100%;
+        }
+        
+        /* Отступ между Input и Output группами */
+        .filter-group:has(#filter-input-min) {
+            margin-bottom: var(--space-md);
+        }
+        
+        /* === BUTTONS - 8 states === */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-xs) var(--space-lg);
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            font-family: var(--font-body);
+            cursor: pointer;
+            transition: background-color var(--dur-short) var(--ease-out),
+                        transform var(--dur-short) var(--ease-out);
+            min-height: 33px;
+            white-space: nowrap;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .btn:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background: var(--color-accent);
+            color: var(--color-accent-ink);
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: var(--color-accent-hover);
+        }
+        
+        .btn-primary:active:not(:disabled) {
+            background: var(--color-accent-active);
+        }
+        
+        .btn-secondary {
+            background: var(--color-paper-3);
+            color: var(--color-ink);
+            transition: background-color var(--dur-short) var(--ease-out),
+                        color var(--dur-short) var(--ease-out);
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--color-border);
+        }
+        
+        .btn-danger {
+            background: var(--color-error);
+            color: var(--color-error-ink);
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: oklch(55% 0.22 25);
+        }
+        
+        /* Quick filters - varied colors */
+        .quick-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-md);
+        }
+        
+        .quick-filters .btn:nth-child(1) {
+            background: var(--color-error);
+            color: var(--color-error-ink);
+        }
+        .quick-filters .btn:nth-child(1):hover {
+            background: oklch(55% 0.22 25);
+        }
+        
+        .quick-filters .btn:nth-child(2) {
+            background: var(--color-warning);
+            color: var(--color-warning-ink);
+        }
+        .quick-filters .btn:nth-child(2):hover {
+            background: oklch(70% 0.17 85);
+        }
+        
+        .quick-filters .btn:nth-child(3) {
+            background: var(--color-success);
+            color: var(--color-success-ink);
+        }
+        .quick-filters .btn:nth-child(3):hover {
+            background: oklch(60% 0.2 140);
+        }
+        
+        .quick-filters .btn:nth-child(4) {
+            background: var(--color-paper-3);
+            color: var(--color-ink);
+        }
+        .quick-filters .btn:nth-child(4):hover {
+            background: var(--color-border);
+        }
+        
+        /* Presets */
+        .presets {
+            margin-top: var(--space-md);
+            padding-top: var(--space-md);
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+        }
+        
+        .presets-list {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+        
+        .presets-list button {
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: 4px;
+            background: var(--color-paper-3);
+            color: var(--color-ink);
+            font-size: 0.8rem;
+        }
+        
+        .presets-list button:hover {
+            background: var(--color-border);
+        }
+        
+        .presets-list button.delete-btn {
+            background: var(--color-error-bg);
+            color: var(--color-error-ink);
+        }
+        
+        .presets-list button.delete-btn:hover {
+            background: var(--color-error);
+            color: var(--color-error-ink);
+        }
+        
+        /* Actions */
+        .actions {
+            margin-top: var(--space-md);
+            display: flex;
+            gap: var(--space-sm);
+        }
+        
+        /* Hidden utility */
+        .hidden {
+            display: none !important;
+        }
+        
+        /* SSE indicator */
+        .sse-status {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            margin-top: var(--space-lg);
+            padding-top: var(--space-lg);
+            border-top: 1px solid var(--color-border);
+        }
+        
+        .sse-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--color-border);
+            transition: background-color var(--dur-short) var(--ease-out);
+        }
+        
+        .sse-indicator.connected {
+            background: var(--color-success);
+            animation: pulse 2s var(--ease-in-out) infinite;
+        }
+        
+        .sse-indicator.disconnected {
+            background: var(--color-error);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Custom period grid */
+        #custom-period {
+            grid-column: span 2;
+        }
+        
+        @media (max-width: 768px) {
+            #custom-period {
+                grid-column: 1 / -1;
+            }
+        }
+        
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+            padding: var(--space-md) var(--space-lg);
+            border-top: 1px solid var(--color-border);
+        }
+        
+        .pagination button {
+            padding: var(--space-xs) var(--space-sm);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            background: var(--color-paper);
+            color: var(--color-ink);
+            cursor: pointer;
+            min-width: 27px;
+            min-height: 27px;
+            font-size: 0.875rem;
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: var(--color-border);
+        }
+        
+        .page-info {
+            font-size: 0.875rem;
+            color: var(--color-ink-muted);
+            padding: 0 var(--space-sm);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <!-- Header -->
+        <header style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-lg);">
+            <div>
+                <h1 style="margin: 0;">Мониторинг OpenRouter аккаунтов</h1>
+                <p class="subtitle" style="margin: var(--space-xs) 0 0 0;">
+                    Обновление в реальном времени • Лимит: 100 запросов / 24ч
+                </p>
+            </div>
+            <button @click="toggleTheme" class="theme-toggle-btn" :class="{ dark: isDark }" :aria-label="`Переключить на ${isDark ? 'светлую' : 'темную'} тему`">
+                <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+        </header>
+        
+        <!-- Общая статистика -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Всего аккаунтов</div>
+                <div class="stat-value">{{ accounts.length }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Активные</div>
+                <div class="stat-value success">{{ activeCount }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Предупреждения</div>
+                <div class="stat-value warning">{{ warningCount }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Исчерпаны</div>
+                <div class="stat-value error">{{ exhaustedCount }}</div>
+            </div>
+        </div>
+        
+        <!-- Токены за сегодня и месяц -->
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));">
+            <div class="stat-card">
+                <div class="stat-label">Токены за сегодня</div>
+                <div class="stat-value metric">{{ formatTokens(stats.today.total) }}</div>
+                <div class="stat-detail">
+                    Input: {{ formatTokens(stats.today.input) }} | Output: {{ formatTokens(stats.today.output) }}
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Токены за месяц</div>
+                <div class="stat-value metric">{{ formatTokens(stats.month.total) }}</div>
+                <div class="stat-detail">
+                    Input: {{ formatTokens(stats.month.input) }} | Output: {{ formatTokens(stats.month.output) }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Таблица аккаунтов -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Аккаунт</th>
+                        <th>Запросы</th>
+                        <th>Прогресс</th>
+                        <th>Статус</th>
+                        <th>Сброс через</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template v-if="accounts.length === 0">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--color-ink-muted); padding: var(--space-xl);">
+                                Загрузка данных...
+                            </td>
+                        </tr>
+                    </template>
+                    <template v-else>
+                        <tr v-for="acc in accounts" :key="acc.account_id" :class="`row-${acc.status}`" :data-account-id="acc.account_id">
+                            <td style="font-weight: 500;">account_{{ acc.account_id }}</td>
+                            <td>{{ acc.request_count }} / {{ acc.limit }}</td>
+                            <td>
+                                <div class="progress-track">
+                                    <div class="progress-bar" :class="acc.status" :style="{ width: percentage(acc.request_count, acc.limit) + '%' }"></div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="status-badge" :class="acc.status">{{ acc.status }}</span>
+                            </td>
+                            <td class="timer-cell" :data-account-id="acc.account_id" :data-reset-at="acc.reset_at || ''">
+                                {{ formatResetTime(acc.reset_at) }}
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- История запросов -->
+        <div class="card" style="padding: 0;">
+            <h2 style="padding: var(--space-lg); margin: 0; border-bottom: 1px solid var(--color-border);">
+                История запросов
+            </h2>
+            
+            <!-- Фильтры -->
+            <div class="filters-panel">
+                <!-- Быстрые фильтры -->
+                <div class="quick-filters">
+                    <button class="btn" @click="quickFilter('429')">Только 429</button>
+                    <button class="btn" @click="quickFilter('error')">Только ошибки</button>
+                    <button class="btn" @click="quickFilter('success')">Только успехи</button>
+                    <button class="btn" @click="resetFilters">Сбросить</button>
+                </div>
+                
+                <!-- Основные фильтры -->
+                <div class="filter-grid">
+                    <!-- Аккаунты (multi) -->
+                    <div class="filter-group">
+                        <label>Аккаунты</label>
+                        <div id="filter-accounts" class="multi-select">
+                            <label v-for="acc in uniqueAccounts" :key="acc">
+                                <input type="checkbox" :value="acc" v-model="filters.accounts" />
+                                account_{{ acc }}
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Модели (multi) -->
+                    <div class="filter-group">
+                        <label>Модели</label>
+                        <div id="filter-models" class="multi-select">
+                            <label v-for="model in uniqueModels" :key="model">
+                                <input type="checkbox" :value="model" v-model="filters.models" />
+                                {{ model }}
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Статусы (multi) -->
+                    <div class="filter-group">
+                        <label>Статусы</label>
+                        <div id="filter-statuses" class="multi-select">
+                            <label><input type="checkbox" value="200" v-model="filters.statuses" /> 200 OK</label>
+                            <label><input type="checkbox" value="429" v-model="filters.statuses" /> 429 Rate Limit</label>
+                            <label><input type="checkbox" value="500" v-model="filters.statuses" /> 500 Error</label>
+                            <label><input type="checkbox" value="502" v-model="filters.statuses" /> 502 Bad Gateway</label>
+                            <label><input type="checkbox" value="503" v-model="filters.statuses" /> 503 Service Unavailable</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Период -->
+                    <div class="filter-group">
+                        <label for="filter-period">Период</label>
+                        <select id="filter-period" v-model="filters.period">
+                            <option value="all">Все время</option>
+                            <option value="1h">Последний час</option>
+                            <option value="24h">24 часа</option>
+                            <option value="7d">7 дней</option>
+                            <option value="today">Сегодня</option>
+                            <option value="yesterday">Вчера</option>
+                            <option value="custom">Кастомный...</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Кастомный период (скрыт по умолчанию) -->
+                    <div id="custom-period" class="filter-group" :class="{ hidden: filters.period !== 'custom' }">
+                        <label for="filter-date-from">От</label>
+                        <input type="datetime-local" v-model="filters.dateFrom" />
+                        <label for="filter-date-to">До</label>
+                        <input type="datetime-local" v-model="filters.dateTo" />
+                    </div>
+                    
+                    <!-- Input токены -->
+                    <div class="filter-group">
+                        <label>Input токены</label>
+                        <div class="token-filter">
+                            <input type="number" id="filter-input-min" v-model="filters.inputMin" placeholder="От" />
+                            <input type="number" id="filter-input-max" v-model="filters.inputMax" placeholder="До" />
+                        </div>
+                    </div>
+                    
+                    <!-- Output токены -->
+                    <div class="filter-group">
+                        <label>Output токены</label>
+                        <div class="token-filter">
+                            <input type="number" id="filter-output-min" v-model="filters.outputMin" placeholder="От" />
+                            <input type="number" id="filter-output-max" v-model="filters.outputMax" placeholder="До" />
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Пресеты -->
+                <div class="presets">
+                    <span style="font-size: 0.875rem; color: var(--color-ink-muted);">Пресеты:</span>
+                    <button class="btn btn-primary" @click="savePreset" style="padding: var(--space-xs) var(--space-md); font-size: 0.8rem;">Сохранить</button>
+                    <div id="presets-list" class="presets-list">
+                        <template v-for="(preset, name) in presets" :key="name">
+                            <button @click="loadPreset(name)">{{ name }}</button>
+                            <button @click="deletePreset(name)" class="delete-btn">✕</button>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Кнопки действий -->
+                <div class="actions">
+                    <button class="btn btn-primary" @click="applyFilters">Применить</button>
+                    <button class="btn btn-secondary" @click="resetFilters">Сбросить</button>
+                </div>
+            </div>
+            
+            <!-- Сводка по токенам (фильтр) -->
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); margin-bottom: var(--space-lg);">
+                <div class="stat-card">
+                    <div class="stat-label">Общее количество токенов</div>
+                    <div class="stat-value metric">{{ formatTokens(filteredStats.total) }}</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Input токены (фильтр)</div>
+                    <div class="stat-value" style="color: var(--color-metric-input);">{{ formatTokens(filteredStats.input) }}</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">Output токены (фильтр)</div>
+                    <div class="stat-value" style="color: var(--color-metric-output);">{{ formatTokens(filteredStats.output) }}</div>
+                </div>
+            </div>
+            
+            <div class="table-container" style="margin-bottom: 0; border: none; border-top: 1px solid var(--color-border);">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Дата + Время</th>
+                            <th>Аккаунт</th>
+                            <th>Модель</th>
+                            <th>Токены (in / out)</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="requests-table">
+                        <template v-if="filteredRequests.length === 0">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--color-ink-muted); padding: var(--space-xl);">
+                                    Нет данных о запросах
+                                </td>
+                            </tr>
+                        </template>
+                        <template v-else>
+                            <tr v-for="req in paginatedRequests" :key="req.id" :class="getRowClass(req.status_code)">
+                                <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-ink-muted);">{{ req.id }}</td>
+                                <td style="font-family: var(--font-mono); font-size: 0.85rem;">{{ req.datetime }}</td>
+                                <td>account_{{ req.account_id }}</td>
+                                <td>{{ req.model }}</td>
+                                <td style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;">
+                                    {{ req.input_tokens || '—' }} / {{ req.output_tokens || '—' }}
+                                </td>
+                                <td>
+                                    <span class="status-badge" :class="getStatusClass(req.status_code)">{{ req.status_code }}</span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Пагинация -->
+            <div class="pagination" v-if="totalPages > 1">
+                <button @click="goToPage(1)" :disabled="currentPage === 1">««</button>
+                <button @click="prevPage" :disabled="currentPage === 1">«</button>
+                <span class="page-info">
+                    {{ currentPage }} / {{ totalPages }} ({{ filteredRequests.length }} запросов)
+                </span>
+                <button @click="nextPage" :disabled="currentPage === totalPages">»</button>
+                <button @click="goToPage(totalPages)" :disabled="currentPage === totalPages">»»</button>
+            </div>
+        </div>
+        
+        <!-- Индикатор подключения SSE -->
+        <div class="sse-status">
+            <div class="sse-indicator" :class="sseConnected ? 'connected' : 'disconnected'" id="sse-indicator"></div>
+            <span style="font-size: 0.875rem; color: var(--color-ink-muted);" id="sse-status">{{ sseStatus }}</span>
+        </div>
+    </div>
+    
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                // Данные
+                const accounts = ref([]);
+                const allRequests = ref([]);
+                const filteredRequests = ref([]);
+                const isFilteringActive = ref(false);
+                
+
+                
+                // SSE
+                let eventSource = null;
+                
+                let filterDebounce = null;
+                let timerInterval = null;
+                
+                // Фильтры
+                const filters = ref({
+                    accounts: [],
+                    models: [],
+                    statuses: [],
+                    period: 'all',
+                    inputMin: '',
+                    inputMax: '',
+                    outputMin: '',
+                    outputMax: '',
+                    dateFrom: '',
+                    dateTo: ''
+                });
+                
+                // Пагинация
+                const currentPage = ref(1);
+                const pageSize = ref(50);
+                
+                // Пресеты
+                const presets = ref(JSON.parse(localStorage.getItem('dashboard_presets') || '{}'));
+                
+                // Тема
+                const isDark = ref(localStorage.getItem('theme') === 'dark');
+                const sseConnected = ref(false);
+                const sseStatus = ref('Подключение...');
+                
+                // Вычисляемые: уникальные аккаунты и модели (из текущих данных в БД)
+                const uniqueAccounts = computed(() => {
+                    return [...new Set(allRequests.value.map(r => r.account_id))].sort();
+                });
+                
+                const uniqueModels = computed(() => {
+                    return [...new Set(allRequests.value.map(r => r.model))].filter(Boolean).sort();
+                });
+                
+                // Вычисляемые: подсчёт статусов
+                const activeCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'active').length;
+                });
+                
+                const warningCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'warning').length;
+                });
+                
+                const exhaustedCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'exhausted').length;
+                });
+                
+                // Вычисляемые: статистика токенов
+                const stats = computed(() => {
+                    const today = countTokensForPeriod(allRequests.value, 'today');
+                    const month = countTokensForPeriod(allRequests.value, 'month');
+                    return { today, month };
+                });
+                
+                // Вычисляемые: статистика по фильтру
+                const filteredStats = computed(() => {
+                    let inputTotal = 0;
+                    let outputTotal = 0;
+                    
+                    filteredRequests.value.forEach(req => {
+                        inputTotal += parseInt(req.input_tokens) || 0;
+                        outputTotal += parseInt(req.output_tokens) || 0;
+                    });
+                    
+                    return {
+                        input: inputTotal,
+                        output: outputTotal,
+                        total: inputTotal + outputTotal
+                    };
+                });
+                
+                // Вычисляемые: пагинация
+                const paginatedRequests = computed(() => {
+                    const start = (currentPage.value - 1) * pageSize.value;
+                    const end = start + pageSize.value;
+                    return filteredRequests.value.slice(start, end);
+                });
+                
+                const totalPages = computed(() => {
+                    return Math.ceil(filteredRequests.value.length / pageSize.value) || 1;
+                });
+                
+                // Методы пагинации
+                function nextPage() {
+                    if (currentPage.value < totalPages.value) currentPage.value++;
+                }
+                function prevPage() {
+                    if (currentPage.value > 1) currentPage.value--;
+                }
+                function goToPage(page) {
+                    currentPage.value = page;
+                }
+                
+                // Форматирование чисел
+                function formatTokens(num) {
+                    return num.toLocaleString('ru-RU');
+                }
+                
+                // Подсчёт токенов за период
+                function countTokensForPeriod(requests, period) {
+                    const now = Date.now() / 1000;
+                    const periods = {
+                        'today': 86400,
+                        'month': 2592000
+                    };
+                    const limit = periods[period];
+                    
+                    let inputTotal = 0;
+                    let outputTotal = 0;
+                    
+                    requests.forEach(req => {
+                        const reqTime = parseDateTime(req.datetime);
+                        if (now - reqTime <= limit) {
+                            inputTotal += parseInt(req.input_tokens) || 0;
+                            outputTotal += parseInt(req.output_tokens) || 0;
+                        }
+                    });
+                    
+                    return { input: inputTotal, output: outputTotal, total: inputTotal + outputTotal };
+                }
+                
+                // Парсинг даты в timestamp
+                function parseDateTime(datetimeStr) {
+                    if (!datetimeStr) return 0;
+                    try {
+                        const parts = datetimeStr.split(' ');
+                        const dateParts = parts[0].split('.');
+                        const timeParts = parts[1] ? parts[1].split(':') : ['0', '0'];
+                        
+                        const day = parseInt(dateParts[0]);
+                        const month = parseInt(dateParts[1]) - 1;
+                        const year = parseInt(dateParts[2]);
+                        const hour = parseInt(timeParts[0]);
+                        const minute = parseInt(timeParts[1]);
+                        
+                        return Math.floor(new Date(year, month, day, hour, minute).getTime() / 1000);
+                    } catch (e) {
+                        console.error('parseDateTime error:', e, datetimeStr);
+                        return 0;
+                    }
+                }
+                
+                // Форматирование времени
+                function formatTime(seconds) {
+                    if (seconds <= 0) return "Сейчас";
+                    const h = Math.floor(seconds / 3600);
+                    const m = Math.floor((seconds % 3600) / 60);
+                    const s = seconds % 60;
+                    if (h > 0) return `${h}ч ${m}м`;
+                    if (m > 0) return `${m}м ${s}с`;
+                    return `${s}с`;
+                }
+                
+                // Форматирование времени сброса
+                function formatResetTime(resetAt) {
+                    if (!resetAt) return '—';
+                    const now = Math.floor(Date.now() / 1000);
+                    const seconds = parseInt(resetAt) - now;
+                    return seconds > 0 ? formatTime(seconds) : 'Сейчас';
+                }
+                
+                // Процент заполнения
+                function percentage(current, limit) {
+                    return Math.min(100, (current / limit) * 100);
+                }
+                
+                // Класс статуса для строки
+                function getRowClass(statusCode) {
+                    if (statusCode === 200) return 'row-active';
+                    if (statusCode === 429) return 'row-exhausted';
+                    return 'row-warning';
+                }
+                
+                // Класс статуса для бейджа
+                function getStatusClass(statusCode) {
+                    if (statusCode === 200) return 'active';
+                    if (statusCode === 429) return 'exhausted';
+                    return 'warning';
+                }
+                
+                // Применение фильтров
+                function applyFilters() {
+                    const f = filters.value;
+                    currentPage.value = 1;
+                    
+                    isFilteringActive.value = !!(
+                        f.accounts.length || f.models.length || f.statuses.length ||
+                        f.period !== 'all' || f.inputMin || f.inputMax || f.outputMin || f.outputMax
+                    );
+                    
+                    filteredRequests.value = allRequests.value.filter(req => {
+                        // Мульти-выбор
+                        if (f.accounts.length && !f.accounts.includes(req.account_id)) return false;
+                        if (f.models.length && !f.models.includes(req.model)) return false;
+                        if (f.statuses.length && !f.statuses.includes(req.status_code.toString())) return false;
+                        
+                        // Период
+                        const now = Date.now() / 1000;
+                        const periods = { '1h': 3600, '24h': 86400, '7d': 604800 };
+                        if (f.period !== 'all' && f.period !== 'custom' && f.period !== 'today' && f.period !== 'yesterday' && periods[f.period]) {
+                            const reqTime = parseDateTime(req.datetime);
+                            if (now - reqTime > periods[f.period]) return false;
+                        }
+                        
+                        // Сегодня
+                        if (f.period === 'today') {
+                            const reqTime = parseDateTime(req.datetime);
+                            const startOfDay = new Date();
+                            startOfDay.setHours(0, 0, 0, 0);
+                            if (reqTime < startOfDay.getTime() / 1000) return false;
+                        }
+                        
+                        // Вчера
+                        if (f.period === 'yesterday') {
+                            const reqTime = parseDateTime(req.datetime);
+                            const startOfDay = new Date();
+                            startOfDay.setDate(startOfDay.getDate() - 1);
+                            startOfDay.setHours(0, 0, 0, 0);
+                            const endOfDay = new Date(startOfDay);
+                            endOfDay.setHours(23, 59, 59, 999);
+                            if (reqTime < startOfDay.getTime() / 1000 || reqTime > endOfDay.getTime() / 1000) return false;
+                        }
+                        
+                        // Кастомный период
+                        if (f.period === 'custom') {
+                            const from = new Date(f.dateFrom).getTime() / 1000;
+                            const to = new Date(f.dateTo).getTime() / 1000;
+                            const reqTime = parseDateTime(req.datetime);
+                            if (reqTime < from || reqTime > to) return false;
+                        }
+                        
+                        // Токены
+                        if (f.inputMin && req.input_tokens < parseInt(f.inputMin)) return false;
+                        if (f.inputMax && req.input_tokens > parseInt(f.inputMax)) return false;
+                        if (f.outputMin && req.output_tokens < parseInt(f.outputMin)) return false;
+                        if (f.outputMax && req.output_tokens > parseInt(f.outputMax)) return false;
+                        
+                        return true;
+                    });
+                }
+
+                // Debounced авто-применение фильтров (для чекбоксов, диапазонов, периода)
+                function scheduleApplyFilters() {
+                    clearTimeout(filterDebounce);
+                    filterDebounce = setTimeout(applyFilters, 200);
+                }
+                
+                // Сброс фильтров
+                function resetFilters() {
+                    filters.value = {
+                        accounts: [],
+                        models: [],
+                        statuses: [],
+                        period: 'all',
+                        inputMin: '',
+                        inputMax: '',
+                        outputMin: '',
+                        outputMax: '',
+                        dateFrom: '',
+                        dateTo: ''
+                    };
+                    isFilteringActive.value = false;
+                    currentPage.value = 1;
+                    filteredRequests.value = allRequests.value;
+                }
+                
+                // Быстрые фильтры
+                function quickFilter(type) {
+                    resetFilters();
+                    if (type === '429') {
+                        filters.value.statuses = ['429'];
+                    } else if (type === 'error') {
+                        filters.value.statuses = ['429', '500', '502', '503'];
+                    } else if (type === 'success') {
+                        filters.value.statuses = ['200'];
+                    }
+                    applyFilters();
+                }
+                
+                // Сохранение пресета
+                function savePreset() {
+                    const name = prompt('Название пресета:');
+                    if (!name) return;
+                    
+                    presets.value[name] = { ...filters.value };
+                    localStorage.setItem('dashboard_presets', JSON.stringify(presets.value));
+                }
+                
+                // Загрузка пресета
+                function loadPreset(name) {
+                    const preset = presets.value[name];
+                    if (!preset) return;
+                    
+                    filters.value = { ...preset };
+                    applyFilters();
+                }
+                
+                // Удаление пресета
+                function deletePreset(name) {
+                    if (!confirm(`Удалить пресет "${name}"?`)) return;
+                    delete presets.value[name];
+                    localStorage.setItem('dashboard_presets', JSON.stringify(presets.value));
+                }
+                
+                // Переключение темы
+                function toggleTheme() {
+                    isDark.value = !isDark.value;
+                    document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light');
+                    localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+                }
+                
+                // Инициализация темы
+                function initTheme() {
+                    const saved = localStorage.getItem('theme') || 'light';
+                    isDark.value = saved === 'dark';
+                    document.documentElement.setAttribute('data-theme', saved);
+                }
+                
+                // Обновление запросов — БД источник истины, просто берём все данные
+                function updateRequests(newRequests) {
+                    if (!newRequests || newRequests.length === 0) return;
+                    
+                    // БД — источник истины, все данные
+                    allRequests.value = newRequests;
+                }
+                
+                // SSE подключение
+                function connectSSE() {
+                    const indicator = document.getElementById('sse-indicator');
+                    const statusEl = document.getElementById('sse-status');
+                    
+                    eventSource = new EventSource('/sse/stats');
+                    
+                    eventSource.onopen = () => {
+                        sseConnected.value = true;
+                        sseStatus.value = 'Подключено (real-time)';
+                    };
+                    
+                    eventSource.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        const statsData = data.stats || data;
+                        const requests = data.requests || [];
+                        
+                        accounts.value = statsData;
+                        updateRequests(requests);
+                        
+                        // Обновляем filteredRequests напрямую (без debounce)
+                        if (!isFilteringActive.value) {
+                            filteredRequests.value = allRequests.value;
+                        }
+                    };
+                    
+                    eventSource.onerror = () => {
+                        sseConnected.value = false;
+                        sseStatus.value = 'Отключено (перезагрузка страницы)';
+                        eventSource.close();
+                        setTimeout(connectSSE, 5000);
+                    };
+                }
+                
+                // Обновление таймеров
+                function updateTimers() {
+                    document.querySelectorAll('.timer-cell[data-reset-at]').forEach(el => {
+                        const resetAt = el.getAttribute('data-reset-at');
+                        if (resetAt && resetAt !== '') {
+                            const seconds = parseInt(resetAt) - Math.floor(Date.now() / 1000);
+                            el.textContent = seconds > 0 ? formatTime(seconds) : 'Сейчас';
+                        }
+                    });
+                }
+                
+                // Watchers для авто-применения фильтров (checkboxes, ranges, period)
+                watch(() => filters.value.accounts, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.models, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.statuses, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.period, scheduleApplyFilters);
+                watch(() => filters.value.inputMin, scheduleApplyFilters);
+                watch(() => filters.value.inputMax, scheduleApplyFilters);
+                watch(() => filters.value.outputMin, scheduleApplyFilters);
+                watch(() => filters.value.outputMax, scheduleApplyFilters);
+
+                // Отладка: отслеживаем изменения allRequests
+                watch(allRequests, (newVal, oldVal) => {
+                    console.log('Requests changed:', {
+                        old: oldVal?.length || 0,
+                        new: newVal?.length || 0,
+                        delta: newVal.length - (oldVal?.length || 0)
+                    });
+                }, { deep: false });
+                
+                // Хуки жизненного цикла
+                onMounted(() => {
+                    initTheme();
+                    connectSSE();
+                    timerInterval = setInterval(updateTimers, 1000);
+                });
+                
+                onUnmounted(() => {
+                    if (eventSource) eventSource.close();
+                    if (timerInterval) clearInterval(timerInterval);
+                    clearTimeout(filterDebounce);
+                });
+                
+                return {
+                    accounts,
+                    allRequests,
+                    filteredRequests,
+                    filters,
+                    presets,
+                    isDark,
+                    sseConnected,
+                    sseStatus,
+                    uniqueAccounts,
+                    uniqueModels,
+                    activeCount,
+                    warningCount,
+                    exhaustedCount,
+                    stats,
+                    filteredStats,
+                    currentPage,
+                    pageSize,
+                    paginatedRequests,
+                    totalPages,
+                    nextPage,
+                    prevPage,
+                    goToPage,
+                    formatTokens,
+                    formatTime,
+                    formatResetTime,
+                    percentage,
+                    getRowClass,
+                    getStatusClass,
+                    applyFilters,
+                    resetFilters,
+                    quickFilter,
+                    savePreset,
+                    loadPreset,
+                    deletePreset,
+                    toggleTheme
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
