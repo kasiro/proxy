@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 
 logging.basicConfig(
@@ -392,6 +393,80 @@ def collect_text_fields(delta):
     return "".join(parts)
 
 
+def _extract_text_from_sse_payload(raw_text: str):
+    """Склеивает текст из SSE data-строк (chat delta.content / responses output_text.delta).
+
+    Возвращает (text, saw_data). Служебные события (reasoning/function_call/arguments)
+    и [DONE] пропускаются. Не-JSON data-строки берутся как есть.
+    """
+    texts = []
+    saw_data = False
+    for line in (raw_text or "").splitlines():
+        s = line.strip()
+        if not s.startswith("data:"):
+            continue
+        saw_data = True
+        payload = s[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            ev = json.loads(payload)
+        except (json.JSONDecodeError, ValueError):
+            texts.append(payload)
+            continue
+        if not isinstance(ev, dict):
+            continue
+        for ch in ev.get("choices", []) or []:
+            if not isinstance(ch, dict):
+                continue
+            d = ch.get("delta", {})
+            if isinstance(d, dict):
+                c = d.get("content")
+                if isinstance(c, str) and c:
+                    texts.append(c)
+        etype = str(ev.get("type", ""))
+        if "reasoning" in etype or "function_call" in etype or "arguments" in etype:
+            continue
+        for key in ("delta", "text_delta", "text"):
+            v = ev.get(key)
+            if isinstance(v, str) and v:
+                texts.append(v)
+                break
+        else:
+            d = ev.get("delta")
+            if isinstance(d, dict):
+                for key in ("text", "output_text"):
+                    v = d.get(key)
+                    if isinstance(v, str) and v:
+                        texts.append(v)
+                        break
+    return "".join(texts), saw_data
+
+
+def _wrap_raw_non_json_as_chat_completion(model: str, raw_bytes: bytes):
+    """Не-JSON тело апстрима (SSE/текст, 200) → chat-completion JSON.
+
+    Hermes — non-stream клиент: сырой SSE вместо JSON он не переварит.
+    Возвращает dict body или None (текста нет — отдать raw как есть).
+    """
+    try:
+        raw_text = raw_bytes.decode("utf-8", errors="replace")
+    except Exception:
+        return None
+    text, saw_data = _extract_text_from_sse_payload(raw_text)
+    text = (text or "").strip()
+    if not text:
+        return None
+    _ = saw_data
+    return {
+        "id": "chatcmpl-" + uuid.uuid4().hex[:12],
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
+    }
+
+
 def convert_non_streaming_response(body):
     msg = body.get("choices", [{}])[0].get("message", {})
     content = msg.get("content", "") or ""
@@ -627,7 +702,7 @@ async def stream_with_sections(upstream_req, forwarded_for=""):
     if forwarded_for:
         req_headers["x-forwarded-for"] = forwarded_for
 
-    client = httpx.AsyncClient(timeout=None)
+    client = httpx.AsyncClient(timeout=None, trust_env=False)
     try:
         resp = await client.send(
             client.build_request(
@@ -795,7 +870,7 @@ async def proxy(request: Request):
 
     if stream:
         if j is None:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False) as client:
                 r = await client.post(
                     UPSTREAM + "/v1/chat/completions",
                     content=body_bytes,
@@ -806,7 +881,7 @@ async def proxy(request: Request):
         log.info("RESPONSE: streaming via stream_with_sections")
         return await stream_with_sections(j, client_host)
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         upstream_resp = await client.post(
             UPSTREAM + "/v1/chat/completions",
             json=j if j is not None else json.loads(body_bytes),
@@ -827,14 +902,42 @@ async def proxy(request: Request):
             log.info("RESPONSE: non-stream finish=%s content=%s", finish, content_preview)
         return JSONResponse(content=result, status_code=upstream_resp.status_code)
     except Exception as e:
-        log.info("RESPONSE: non-stream error=%s, raw_len=%d", e, len(upstream_resp.content))
-        return Response(content=upstream_resp.content, status_code=upstream_resp.status_code, headers=dict(upstream_resp.headers))
+        raw = upstream_resp.content
+        log.info("RESPONSE: non-stream error=%s, raw_len=%d", e, len(raw))
+        model_name = j.get("model", "deepseek") if isinstance(j, dict) else "deepseek"
+        wrapped = _wrap_raw_non_json_as_chat_completion(model_name, raw)
+        if wrapped is not None:
+            log.info("RESPONSE: non-stream wrapped raw upstream body into chat.completion (raw_len=%d)", len(raw))
+            return JSONResponse(content=wrapped, status_code=upstream_resp.status_code)
+        return Response(content=raw, status_code=upstream_resp.status_code, headers=dict(upstream_resp.headers))
 
 
 
 
 
 
+
+
+@app.get("/v1/models")
+@app.get("/models")
+async def models_list(request: Request):
+    """Алиас model listing для Hermes-проверки: /models → тот же ответ, что /v1/models.
+
+    Прямой ответ (без редиректа 307): оба пути проксируют GET в UPSTREAM + "/v1/models".
+    """
+    upstream_headers = strip_hop_by_hop_headers(dict(request.headers))
+    upstream_headers.pop("host", None)
+    client_host = request.client.host if request.client else "unknown"
+    if not upstream_headers.get("x-forwarded-for"):
+        upstream_headers["x-forwarded-for"] = client_host
+    async with httpx.AsyncClient(trust_env=False) as client:
+        resp = await client.get(
+            UPSTREAM + "/v1/models",
+            headers=upstream_headers,
+            timeout=None,
+        )
+    log.info("MODELS %s -> %d (len=%d)", request.url.path, resp.status_code, len(resp.content))
+    return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
 
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
@@ -847,7 +950,7 @@ async def catch_all_proxy(request: Request, path: str):
     client_host = request.client.host if request.client else "unknown"
     if not upstream_headers.get("x-forwarded-for"):
         upstream_headers["x-forwarded-for"] = client_host
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         resp = await client.request(
             request.method,
             UPSTREAM + "/" + path,

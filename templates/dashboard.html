@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>OdiRouter Dashboard</title>
     <!-- Hallmark · pre-emit critique: P5 H4 E5 S4 R5 V5 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -11,6 +12,11 @@
            DESIGN TOKENS — OKLCH, 4pt grid
            ═══════════════════════════════════════════ */
         :root {
+            /* Site supports both themes — native UI (scrollbars, form
+               controls) follows color-scheme (dark-mode guide);
+               synced with [data-theme] overrides below. */
+            color-scheme: light dark;
+
             /* Typography */
             --font-display: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
             --font-body: 'Inter', system-ui, -apple-system, sans-serif;
@@ -67,6 +73,10 @@
             --metric-total: oklch(65% 0.2 250);
             --row-hover: oklch(22% 0.01 260);
             --input-bg: oklch(15% 0.01 260);
+            --success-ink: oklch(18% 0.05 140);
+            --warning-ink: oklch(20% 0.05 85);
+            --error-ink: oklch(18% 0.05 25);
+            --scroll-thumb: oklch(35% 0.02 260);
         }
 
         /* ═══ LIGHT THEME ═══ */
@@ -95,7 +105,15 @@
             --metric-total: oklch(55% 0.2 250);
             --row-hover: oklch(95% 0.005 260);
             --input-bg: oklch(100% 0 0);
+            --success-ink: oklch(20% 0.06 140);
+            --warning-ink: oklch(22% 0.06 85);
+            --error-ink: oklch(25% 0.07 25);
+            --scroll-thumb: oklch(78% 0.02 260);
         }
+
+        /* ═══ COLOR-SCHEME SYNC (dark-mode guide) ═══ */
+        html[data-theme="dark"] { color-scheme: dark; }
+        html[data-theme="light"] { color-scheme: light; }
 
         /* ═══ REDUCED MOTION ═══ */
         @media (prefers-reduced-motion: reduce) {
@@ -103,6 +121,11 @@
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
                 transition-duration: 0.01ms !important;
+            }
+            /* Accessibility guide pattern: dampen persistent
+               indicators instead of pulsing them. */
+            .sse-dot--on {
+                animation: none;
             }
         }
 
@@ -124,6 +147,13 @@
             margin: 0;
             min-height: 100vh;
             overflow-x: clip;
+        }
+
+        /* Visible keyboard focus for every interactive element
+           (accessibility guide: always style :focus-visible). */
+        :where(a:any-link, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
         }
 
         /* ═══ TYPOGRAPHY ═══ */
@@ -209,23 +239,13 @@
         [data-theme="light"] .icon-moon { display: block; }
 
         /* ═══ STAT CARDS ═══ */
+        /* Responsive card grid: tracks follow the container width
+           (css-layout guide: repeat(auto-fit, minmax(min, 1fr))). */
         .stats-row {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
             gap: var(--space-4);
             margin-bottom: var(--space-6);
-        }
-
-        @media (max-width: 900px) {
-            .stats-row {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 480px) {
-            .stats-row {
-                grid-template-columns: 1fr;
-            }
         }
 
         .stat {
@@ -233,6 +253,7 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             padding: var(--space-4) var(--space-6);
+            min-width: 0;
         }
 
         .stat-label {
@@ -250,12 +271,15 @@
             font-family: var(--font-display);
             font-variant-numeric: tabular-nums;
             line-height: 1.2;
+            overflow-wrap: break-word;
         }
 
         .stat-value--success { color: var(--success); }
         .stat-value--warning { color: var(--warning); }
         .stat-value--error { color: var(--error); }
         .stat-value--accent { color: var(--metric-total); }
+        .stat-value--metric-in { color: var(--metric-input); }
+        .stat-value--metric-out { color: var(--metric-output); }
 
         .stat-detail {
             font-size: 0.8rem;
@@ -267,15 +291,9 @@
         /* ═══ TOKEN ROW (2 cards) ═══ */
         .tokens-row {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
             gap: var(--space-4);
             margin-bottom: var(--space-6);
-        }
-
-        @media (max-width: 600px) {
-            .tokens-row {
-                grid-template-columns: 1fr;
-            }
         }
 
         /* ═══ TABLE CONTAINER ═══ */
@@ -500,6 +518,29 @@
             margin-bottom: var(--space-4);
         }
 
+        [data-theme="dark"] .quick-row .btn {
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .quick-row .btn--accent {
+            color: var(--accent-text);
+        }
+
+        /* Colored quick-filter buttons keep dark text on their bright
+           backgrounds in dark theme (contrast fix — the generic light
+           .quick-row .btn rule above must not win here). */
+        [data-theme="dark"] .quick-row .btn--success {
+            color: var(--success-ink);
+        }
+
+        [data-theme="dark"] .quick-row .btn--warning {
+            color: var(--warning-ink);
+        }
+
+        [data-theme="dark"] .quick-row .btn--error {
+            color: var(--error-ink);
+        }
+
         /* ═══ BUTTONS ═══ */
         .btn {
             display: inline-flex;
@@ -556,23 +597,51 @@
             background: var(--border);
         }
 
+        .btn--ghost:active:not(:disabled) {
+            background: var(--border);
+            transform: scale(0.98);
+        }
+
         .btn--error {
             background: var(--error);
-            color: var(--error-text);
+            color: var(--error-ink);
         }
 
         .btn--error:hover:not(:disabled) {
             opacity: 0.9;
         }
 
+        .btn--error:active:not(:disabled) {
+            opacity: 0.85;
+            transform: scale(0.98);
+        }
+
         .btn--warning {
             background: var(--warning);
-            color: var(--warning-text);
+            color: var(--warning-ink);
+        }
+
+        .btn--warning:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn--warning:active:not(:disabled) {
+            opacity: 0.85;
+            transform: scale(0.98);
         }
 
         .btn--success {
             background: var(--success);
-            color: var(--success-text);
+            color: var(--success-ink);
+        }
+
+        .btn--success:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn--success:active:not(:disabled) {
+            opacity: 0.85;
+            transform: scale(0.98);
         }
 
         .btn--sm {
@@ -628,6 +697,15 @@
             background: var(--border);
         }
 
+        .preset-chip span {
+            cursor: pointer;
+        }
+
+        .preset-chip:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
         .preset-delete {
             background: none;
             border: none;
@@ -643,6 +721,11 @@
             color: var(--error);
         }
 
+        .preset-delete:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
         /* ═══ ACTIONS ROW ═══ */
         .actions {
             display: flex;
@@ -653,15 +736,9 @@
         /* ═══ FILTER SUMMARY ═══ */
         .summary-row {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
             gap: var(--space-4);
             margin-bottom: var(--space-4);
-        }
-
-        @media (max-width: 600px) {
-            .summary-row {
-                grid-template-columns: 1fr;
-            }
         }
 
         .summary-card {
@@ -669,6 +746,7 @@
             background: var(--bg-surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
+            min-width: 0;
         }
 
         .summary-card .stat-label {
@@ -709,6 +787,11 @@
 
         .pagination button:hover:not(:disabled) {
             background: var(--border);
+        }
+
+        .pagination button:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
         }
 
         .page-info {
@@ -773,6 +856,14 @@
             color: var(--text-muted);
         }
 
+        /* Replacements for former inline style="" attributes —
+           markup stays free of presentational styles. */
+        .cell-id { font-weight: 500; }
+        .cell-progress { min-width: 120px; }
+        .cell-sm { font-size: 0.8rem; }
+        .filter-label--offset { margin-top: var(--space-2); }
+        .summary-row--spaced { margin-top: var(--space-6); }
+
         .sr-only {
             position: absolute;
             width: 1px;
@@ -798,6 +889,160 @@
             display: flex;
             gap: var(--space-4);
             align-items: start;
+        }
+
+        /* ═══════════════════════════════════════════
+           RESPONSIVE TABLES — container queries
+           (size-aware-styling guide: the layout follows
+           the container width, not the viewport)
+           ═══════════════════════════════════════════ */
+        .table-wrap {
+            container-type: inline-size;
+            container-name: table-scroll;
+            scrollbar-width: thin;
+            scrollbar-color: var(--scroll-thumb) transparent;
+        }
+
+        .multi-select {
+            scrollbar-width: thin;
+            scrollbar-color: var(--scroll-thumb) transparent;
+        }
+
+        /* ── History: vertical scroll + sticky thead ──
+              (state-aware-sticky-headers guide, baseline
+              position: sticky; scroll-state queries skipped —
+              limited availability + table structure) */
+        .table-wrap--flush {
+            margin-bottom: 0;
+            border: none;
+        }
+
+        .table-wrap--history {
+            max-height: min(70vh, 640px);
+            overflow-y: auto;
+        }
+
+        .history-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--bg-surface);
+        }
+
+        /* ── Long history: skip rendering off-screen rows ──
+              (defer-rendering-heavy-content guide:
+              content-visibility: auto MUST be paired with
+              contain-intrinsic-size) */
+        .history-table tbody tr {
+            content-visibility: auto;
+            contain-intrinsic-size: auto 48px;
+        }
+
+        /* ── Compact tables in narrow containers ── */
+        @container table-scroll (max-width: 768px) {
+            .accounts-table,
+            .history-table {
+                font-size: 0.8rem;
+            }
+
+            .accounts-table th,
+            .accounts-table td,
+            .history-table th,
+            .history-table td {
+                padding: var(--space-2) var(--space-3);
+            }
+
+            .accounts-table th,
+            .history-table th {
+                white-space: normal;
+            }
+        }
+
+        /* ── Stacked cards in very narrow containers:
+              no horizontal scrolling at 320–600px ── */
+        @container table-scroll (max-width: 600px) {
+            .accounts-table thead,
+            .history-table thead {
+                display: block;
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+                padding: 0;
+                margin: -1px;
+            }
+
+            .accounts-table tbody,
+            .history-table tbody {
+                display: block;
+            }
+
+            .accounts-table tbody tr,
+            .history-table tbody tr {
+                display: grid;
+                gap: var(--space-1);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                padding: var(--space-3);
+                margin: var(--space-2);
+            }
+
+            .accounts-table td,
+            .history-table td {
+                display: grid;
+                grid-template-columns: 7rem 1fr;
+                gap: var(--space-2);
+                align-items: center;
+                border-bottom: none;
+                padding: var(--space-1) 0;
+                min-width: 0;
+            }
+
+            .accounts-table td > *,
+            .history-table td > * {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+
+            .accounts-table td::before,
+            .history-table td::before {
+                font-size: 0.7rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: var(--text-muted);
+            }
+
+            .accounts-table td:nth-child(1)::before { content: "Аккаунт"; }
+            .accounts-table td:nth-child(2)::before { content: "Запросы"; }
+            .accounts-table td:nth-child(3)::before { content: "Прогресс"; }
+            .accounts-table td:nth-child(4)::before { content: "Статус"; }
+            .accounts-table td:nth-child(5)::before { content: "Сброс через"; }
+
+            .history-table td:nth-child(1)::before { content: "#"; }
+            .history-table td:nth-child(2)::before { content: "Дата + Время"; }
+            .history-table td:nth-child(3)::before { content: "Аккаунт"; }
+            .history-table td:nth-child(4)::before { content: "Модель"; }
+            .history-table td:nth-child(5)::before { content: "Токены"; }
+            .history-table td:nth-child(6)::before { content: "Статус"; }
+
+            .accounts-table td.empty::before,
+            .history-table td.empty::before {
+                content: none;
+            }
+
+            .accounts-table td.empty,
+            .history-table td.empty {
+                display: block;
+                text-align: center;
+            }
+
+            .cell-progress {
+                min-width: 0;
+            }
         }
     </style>
 </head>
@@ -871,8 +1116,8 @@
         </div>
 
         <!-- ═══ ACCOUNTS TABLE ═══ -->
-        <div class="table-wrap">
-            <table>
+        <div class="table-wrap table-wrap--accounts">
+            <table class="accounts-table">
                 <thead>
                     <tr>
                         <th>Аккаунт</th>
@@ -890,9 +1135,9 @@
                     </template>
                     <template v-else>
                         <tr v-for="acc in accounts" :key="acc.account_id" :class="`row-${acc.status}`">
-                            <td style="font-weight: 500;">account_{{ acc.account_id }}</td>
+                            <td class="cell-id">account_{{ acc.account_id }}</td>
                             <td class="mono">{{ acc.request_count }} / {{ acc.limit }}</td>
-                            <td style="min-width: 120px;">
+                            <td class="cell-progress">
                                 <div class="progress">
                                     <div
                                         class="progress-fill"
@@ -969,7 +1214,7 @@
 
                     <!-- Period -->
                     <div class="filter-group">
-                        <div class="filter-label" for="filter-period">Период</div>
+                        <label class="filter-label" for="filter-period">Период</label>
                         <select id="filter-period" v-model="filters.period">
                             <option value="all">Все время</option>
                             <option value="1h">Последний час</option>
@@ -983,27 +1228,27 @@
 
                     <!-- Custom period (hidden by default) -->
                     <div id="custom-period" class="filter-group" :class="{ show: filters.period === 'custom' }">
-                        <div class="filter-label">От</div>
-                        <input type="datetime-local" v-model="filters.dateFrom" />
-                        <div class="filter-label" style="margin-top: var(--space-2);">До</div>
-                        <input type="datetime-local" v-model="filters.dateTo" />
+                        <label class="filter-label" for="filter-date-from">От</label>
+                        <input id="filter-date-from" type="datetime-local" v-model="filters.dateFrom" />
+                        <label class="filter-label filter-label--offset" for="filter-date-to">До</label>
+                        <input id="filter-date-to" type="datetime-local" v-model="filters.dateTo" />
                     </div>
 
                     <!-- Input tokens -->
                     <div class="filter-group">
-                        <div class="filter-label">Input токены</div>
+                        <label class="filter-label" for="filter-input-min">Input токены</label>
                         <div class="token-fields">
-                            <input type="number" v-model="filters.inputMin" placeholder="От" />
-                            <input type="number" v-model="filters.inputMax" placeholder="До" />
+                            <input id="filter-input-min" type="number" v-model="filters.inputMin" placeholder="От" />
+                            <input id="filter-input-max" type="number" v-model="filters.inputMax" placeholder="До" />
                         </div>
                     </div>
 
                     <!-- Output tokens -->
                     <div class="filter-group">
-                        <div class="filter-label">Output токены</div>
+                        <label class="filter-label" for="filter-output-min">Output токены</label>
                         <div class="token-fields">
-                            <input type="number" v-model="filters.outputMin" placeholder="От" />
-                            <input type="number" v-model="filters.outputMax" placeholder="До" />
+                            <input id="filter-output-min" type="number" v-model="filters.outputMin" placeholder="От" />
+                            <input id="filter-output-max" type="number" v-model="filters.outputMax" placeholder="До" />
                         </div>
                     </div>
                 </div>
@@ -1015,7 +1260,7 @@
                     <div class="presets-list">
                         <template v-for="(preset, name) in presets" :key="name">
                             <span class="preset-chip">
-                                <span @click="loadPreset(name)" style="cursor: pointer;">{{ name }}</span>
+                                <span @click="loadPreset(name)">{{ name }}</span>
                                 <button class="preset-delete" @click="deletePreset(name)" :aria-label="`Удалить пресет ${name}`">✕</button>
                             </span>
                         </template>
@@ -1029,24 +1274,24 @@
                 </div>
 
                 <!-- Filter summary -->
-                <div class="summary-row" style="margin-top: var(--space-6);">
+                <div class="summary-row summary-row--spaced">
                     <div class="summary-card">
                         <div class="stat-label">Общее токенов</div>
                         <div class="stat-value stat-value--accent">{{ formatTokens(filteredStats.total) }}</div>
                     </div>
                     <div class="summary-card">
                         <div class="stat-label">Input токены</div>
-                        <div class="stat-value" style="color: var(--metric-input);">{{ formatTokens(filteredStats.input) }}</div>
+                        <div class="stat-value stat-value--metric-in">{{ formatTokens(filteredStats.input) }}</div>
                     </div>
                     <div class="summary-card">
                         <div class="stat-label">Output токены</div>
-                        <div class="stat-value" style="color: var(--metric-output);">{{ formatTokens(filteredStats.output) }}</div>
+                        <div class="stat-value stat-value--metric-out">{{ formatTokens(filteredStats.output) }}</div>
                     </div>
                 </div>
 
                 <!-- History table -->
-                <div class="table-wrap" style="margin-bottom: 0; border: none;">
-                    <table>
+                <div class="table-wrap table-wrap--history table-wrap--flush">
+                    <table class="history-table">
                         <thead>
                             <tr>
                                 <th>#</th>
@@ -1065,8 +1310,8 @@
                             </template>
                             <template v-else>
                                 <tr v-for="req in paginatedRequests" :key="req.id" :class="getRowClass(req.status_code)">
-                                    <td class="mono text-muted" style="font-size: 0.8rem;">{{ req.id }}</td>
-                                    <td class="mono" style="font-size: 0.8rem;">{{ req.datetime }}</td>
+                                    <td class="mono text-muted cell-sm">{{ req.id }}</td>
+                                    <td class="mono cell-sm">{{ req.datetime }}</td>
                                     <td>account_{{ req.account_id }}</td>
                                     <td>{{ req.model }}</td>
                                     <td class="mono">

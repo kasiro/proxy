@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OdiRouter Dashboard</title>
+    <!-- Hallmark · pre-emit critique: P5 H4 E5 S4 R5 V5 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        /* ═══════════════════════════════════════════
+           DESIGN TOKENS — OKLCH, 4pt grid
+           ═══════════════════════════════════════════ */
+        :root {
+            /* Typography */
+            --font-display: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+            --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+            /* Spacing — 4pt grid */
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-6: 24px;
+            --space-8: 32px;
+            --space-12: 48px;
+
+            /* Motion */
+            --dur-fast: 120ms;
+            --dur-normal: 200ms;
+            --ease-out: cubic-bezier(0.33, 0.85, 0.4, 0.96);
+
+            /* Focus */
+            --focus-ring: 2px solid var(--accent);
+            --focus-offset: 2px;
+
+            /* Border radius */
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+            --radius-full: 9999px;
+        }
+
+        /* ═══ DARK THEME (default) ═══ */
+        [data-theme="dark"] {
+            --bg-primary: oklch(13% 0.01 260);
+            --bg-surface: oklch(17% 0.01 260);
+            --bg-card: oklch(20% 0.01 260);
+            --border: oklch(28% 0.01 260);
+            --text-primary: oklch(90% 0.01 260);
+            --text-muted: oklch(55% 0.02 260);
+            --accent: oklch(65% 0.2 250);
+            --accent-hover: oklch(70% 0.22 250);
+            --accent-active: oklch(60% 0.24 250);
+            --accent-text: oklch(13% 0.01 260);
+            --success: oklch(70% 0.18 140);
+            --success-bg: oklch(20% 0.04 140);
+            --success-text: oklch(85% 0.08 140);
+            --warning: oklch(75% 0.16 85);
+            --warning-bg: oklch(25% 0.05 85);
+            --warning-text: oklch(90% 0.1 85);
+            --error: oklch(65% 0.2 25);
+            --error-bg: oklch(22% 0.05 25);
+            --error-text: oklch(85% 0.08 25);
+            --metric-input: oklch(70% 0.18 140);
+            --metric-output: oklch(70% 0.18 30);
+            --metric-total: oklch(65% 0.2 250);
+            --row-hover: oklch(22% 0.01 260);
+            --input-bg: oklch(15% 0.01 260);
+        }
+
+        /* ═══ LIGHT THEME ═══ */
+        [data-theme="light"] {
+            --bg-primary: oklch(97% 0.005 260);
+            --bg-surface: oklch(100% 0 0);
+            --bg-card: oklch(100% 0 0);
+            --border: oklch(88% 0.01 260);
+            --text-primary: oklch(15% 0.02 260);
+            --text-muted: oklch(45% 0.02 260);
+            --accent: oklch(55% 0.2 250);
+            --accent-hover: oklch(50% 0.22 250);
+            --accent-active: oklch(45% 0.24 250);
+            --accent-text: oklch(98% 0.01 250);
+            --success: oklch(65% 0.18 140);
+            --success-bg: oklch(95% 0.04 140);
+            --success-text: oklch(25% 0.08 140);
+            --warning: oklch(75% 0.16 85);
+            --warning-bg: oklch(96% 0.05 85);
+            --warning-text: oklch(30% 0.1 85);
+            --error: oklch(60% 0.2 25);
+            --error-bg: oklch(95% 0.05 25);
+            --error-text: oklch(25% 0.08 25);
+            --metric-input: oklch(65% 0.18 140);
+            --metric-output: oklch(65% 0.18 30);
+            --metric-total: oklch(55% 0.2 250);
+            --row-hover: oklch(95% 0.005 260);
+            --input-bg: oklch(100% 0 0);
+        }
+
+        /* ═══ REDUCED MOTION ═══ */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* ═══ BASE ═══ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            overflow-x: clip;
+            font-family: var(--font-body);
+            font-size: 16px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            overflow-x: clip;
+        }
+
+        /* ═══ TYPOGRAPHY ═══ */
+        h1, h2, h3 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            line-height: 1.15;
+            margin: 0;
+            font-style: normal;
+        }
+
+        h1 {
+            font-size: clamp(1.25rem, 3vw, 1.75rem);
+        }
+
+        h2 {
+            font-size: clamp(1rem, 2.5vw, 1.25rem);
+        }
+
+        /* ═══ LAYOUT ═══ */
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--space-8);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: var(--space-4);
+            }
+        }
+
+        /* ═══ HEADER ═══ */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-4);
+            margin-bottom: var(--space-8);
+        }
+
+        .header-meta {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: var(--space-1);
+        }
+
+        .theme-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            transition: background-color var(--dur-fast) var(--ease-out),
+                        border-color var(--dur-fast) var(--ease-out);
+        }
+
+        .theme-btn:hover {
+            background: var(--border);
+        }
+
+        .theme-btn:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
+        .theme-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .icon-sun { display: none; }
+        .icon-moon { display: block; }
+        [data-theme="dark"] .icon-sun { display: block; }
+        [data-theme="dark"] .icon-moon { display: none; }
+        [data-theme="light"] .icon-sun { display: none; }
+        [data-theme="light"] .icon-moon { display: block; }
+
+        /* ═══ STAT CARDS ═══ */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+
+        @media (max-width: 900px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-4) var(--space-6);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            margin-bottom: var(--space-1);
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            font-family: var(--font-display);
+            font-variant-numeric: tabular-nums;
+            line-height: 1.2;
+        }
+
+        .stat-value--success { color: var(--success); }
+        .stat-value--warning { color: var(--warning); }
+        .stat-value--error { color: var(--error); }
+        .stat-value--accent { color: var(--metric-total); }
+
+        .stat-detail {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: var(--space-1);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ═══ TOKEN ROW (2 cards) ═══ */
+        .tokens-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+
+        @media (max-width: 600px) {
+            .tokens-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ═══ TABLE CONTAINER ═══ */
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-6);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        thead {
+            background: var(--bg-surface);
+        }
+
+        th {
+            text-align: left;
+            padding: var(--space-3) var(--space-4);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tbody tr {
+            transition: background-color var(--dur-fast) var(--ease-out);
+        }
+
+        tbody tr:hover {
+            background: var(--row-hover);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Row status colors */
+        .row-active { background: var(--success-bg); }
+        .row-warning { background: var(--warning-bg); }
+        .row-exhausted { background: var(--error-bg); }
+
+        /* ═══ STATUS BADGE ═══ */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-full);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+        }
+
+        .badge--active {
+            background: var(--success-bg);
+            color: var(--success-text);
+        }
+
+        .badge--warning {
+            background: var(--warning-bg);
+            color: var(--warning-text);
+        }
+
+        .badge--exhausted {
+            background: var(--error-bg);
+            color: var(--error-text);
+        }
+
+        /* ═══ PROGRESS BAR ═══ */
+        .progress {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-surface);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: var(--radius-full);
+            transition: width var(--dur-normal) var(--ease-out);
+        }
+
+        .progress-fill--active { background: var(--success); }
+        .progress-fill--warning { background: var(--warning); }
+        .progress-fill--exhausted { background: var(--error); }
+
+        /* ═══ CARD (generic section wrapper) ═══ */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-6);
+        }
+
+        .card-header {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-body {
+            padding: var(--space-6);
+        }
+
+        @media (max-width: 768px) {
+            .card-body {
+                padding: var(--space-4);
+            }
+        }
+
+        /* ═══ FILTERS ═══ */
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            margin-bottom: var(--space-1);
+        }
+
+        .multi-select {
+            max-height: 140px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--space-1);
+            background: var(--input-bg);
+        }
+
+        .multi-select label {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-1) var(--space-2);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            transition: background-color var(--dur-fast) var(--ease-out);
+        }
+
+        .multi-select label:hover {
+            background: var(--bg-surface);
+        }
+
+        .multi-select input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+
+        select,
+        input[type="number"],
+        input[type="datetime-local"] {
+            padding: var(--space-2) var(--space-3);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 0.8rem;
+            font-family: var(--font-body);
+            color: var(--text-primary);
+            background: var(--input-bg);
+            min-height: 33px;
+            transition: border-color var(--dur-fast) var(--ease-out);
+        }
+
+        select:focus,
+        input[type="number"]:focus,
+        input[type="datetime-local"]:focus {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+            border-color: var(--accent);
+        }
+
+        .token-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-2);
+        }
+
+        .token-fields input {
+            min-width: 0;
+            width: 100%;
+        }
+
+        /* Token summary row — spans full width */
+        .filter-group--wide {
+            grid-column: 1 / -1;
+        }
+
+        /* ═══ QUICK FILTERS ═══ */
+        .quick-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-2);
+            margin-bottom: var(--space-4);
+        }
+
+        [data-theme="dark"] .quick-row .btn {
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .quick-row .btn--accent {
+            color: var(--accent-text);
+        }
+
+        /* ═══ BUTTONS ═══ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-1);
+            padding: var(--space-1) var(--space-4);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: var(--font-body);
+            cursor: pointer;
+            min-height: 33px;
+            white-space: nowrap;
+            transition: background-color var(--dur-fast) var(--ease-out),
+                        transform var(--dur-fast) var(--ease-out);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .btn:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn--accent {
+            background: var(--accent);
+            color: var(--accent-text);
+        }
+
+        .btn--accent:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+        .btn--accent:active:not(:disabled) {
+            background: var(--accent-active);
+        }
+
+        .btn--ghost {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn--ghost:hover:not(:disabled) {
+            background: var(--border);
+        }
+
+        .btn--ghost:active:not(:disabled) {
+            background: var(--border);
+            transform: scale(0.98);
+        }
+
+        .btn--error {
+            background: var(--error);
+            color: var(--error-text);
+        }
+
+        .btn--error:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn--error:active:not(:disabled) {
+            opacity: 0.85;
+            transform: scale(0.98);
+        }
+
+        .btn--warning {
+            background: var(--warning);
+            color: var(--warning-text);
+        }
+
+        .btn--warning:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn--warning:active:not(:disabled) {
+            opacity: 0.85;
+            transform: scale(0.98);
+        }
+
+        .btn--success {
+            background: var(--success);
+            color: var(--success-text);
+        }
+
+        .btn--success:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn--success:active:not(:disabled) {
+            opacity: 0.85;
+            transform: scale(0.98);
+        }
+
+        .btn--sm {
+            padding: var(--space-1) var(--space-2);
+            font-size: 0.75rem;
+        }
+
+        /* ═══ PRESETS ═══ */
+        .presets {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--space-2);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--border);
+            margin-top: var(--space-4);
+        }
+
+        .presets-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .presets-list {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .preset-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background-color var(--dur-fast) var(--ease-out);
+        }
+
+        [data-theme="dark"] .preset-chip {
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .preset-chip span {
+            color: var(--text-primary);
+        }
+
+        .preset-chip:hover {
+            background: var(--border);
+        }
+
+        .preset-chip:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
+        .preset-delete {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0;
+            font-size: 0.8rem;
+            line-height: 1;
+            transition: color var(--dur-fast) var(--ease-out);
+        }
+
+        .preset-delete:hover {
+            color: var(--error);
+        }
+
+        .preset-delete:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
+        /* ═══ ACTIONS ROW ═══ */
+        .actions {
+            display: flex;
+            gap: var(--space-2);
+            margin-top: var(--space-4);
+        }
+
+        /* ═══ FILTER SUMMARY ═══ */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        @media (max-width: 600px) {
+            .summary-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .summary-card {
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+
+        .summary-card .stat-label {
+            margin-bottom: var(--space-1);
+        }
+
+        .summary-card .stat-value {
+            font-size: 1.25rem;
+        }
+
+        /* ═══ PAGINATION ═══ */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: var(--space-4);
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination button {
+            padding: var(--space-1) var(--space-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 33px;
+            min-height: 33px;
+            font-size: 0.8rem;
+            transition: background-color var(--dur-fast) var(--ease-out);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: var(--border);
+        }
+
+        .pagination button:focus-visible {
+            outline: var(--focus-ring);
+            outline-offset: var(--focus-offset);
+        }
+
+        .page-info {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            padding: 0 var(--space-2);
+            white-space: nowrap;
+        }
+
+        /* ═══ SSE STATUS ═══ */
+        .sse-bar {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-4) 0;
+            border-top: 1px solid var(--border);
+            margin-top: var(--space-4);
+        }
+
+        .sse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: var(--radius-full);
+            background: var(--border);
+            flex-shrink: 0;
+        }
+
+        .sse-dot--on {
+            background: var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .sse-dot--off {
+            background: var(--error);
+        }
+
+        .sse-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ═══ EMPTY STATE ═══ */
+        .empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: var(--space-8) var(--space-4);
+            font-size: 0.9rem;
+        }
+
+        /* ═══ MISC ═══ */
+        .mono {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Hide custom period by default */
+        #custom-period {
+            display: none;
+            grid-column: 1 / -1;
+        }
+
+        #custom-period.show {
+            display: flex;
+            gap: var(--space-4);
+            align-items: start;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <!-- ═══ HEADER ═══ -->
+        <header class="header">
+            <div>
+                <h1>OdiRouter Dashboard</h1>
+                <p class="header-meta">
+                    Обновление в реальном времени
+                    <span aria-hidden="true">/</span>
+                    Лимит: 100 запросов / 24ч
+                </p>
+            </div>
+            <button
+                @click="toggleTheme"
+                class="theme-btn"
+                :aria-label="`Переключить на ${isDark ? 'светлую' : 'тёмную'} тему`"
+            >
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- ═══ STATS: 4 карточки ═══ -->
+        <div class="stats-row">
+            <div class="stat">
+                <div class="stat-label">Всего аккаунтов</div>
+                <div class="stat-value">{{ accounts.length }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Активные</div>
+                <div class="stat-value stat-value--success">{{ activeCount }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Предупреждения</div>
+                <div class="stat-value stat-value--warning">{{ warningCount }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Исчерпаны</div>
+                <div class="stat-value stat-value--error">{{ exhaustedCount }}</div>
+            </div>
+        </div>
+
+        <!-- ═══ TOKENS: 2 карточки ═══ -->
+        <div class="tokens-row">
+            <div class="stat">
+                <div class="stat-label">Токены за сегодня</div>
+                <div class="stat-value stat-value--accent">{{ formatTokens(stats.today.total) }}</div>
+                <div class="stat-detail">
+                    Input: {{ formatTokens(stats.today.input) }}
+                    <span aria-hidden="true">/</span>
+                    Output: {{ formatTokens(stats.today.output) }}
+                </div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Токены за месяц</div>
+                <div class="stat-value stat-value--accent">{{ formatTokens(stats.month.total) }}</div>
+                <div class="stat-detail">
+                    Input: {{ formatTokens(stats.month.input) }}
+                    <span aria-hidden="true">/</span>
+                    Output: {{ formatTokens(stats.month.output) }}
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ ACCOUNTS TABLE ═══ -->
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Аккаунт</th>
+                        <th>Запросы</th>
+                        <th>Прогресс</th>
+                        <th>Статус</th>
+                        <th>Сброс через</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template v-if="accounts.length === 0">
+                        <tr>
+                            <td colspan="5" class="empty">Загрузка данных...</td>
+                        </tr>
+                    </template>
+                    <template v-else>
+                        <tr v-for="acc in accounts" :key="acc.account_id" :class="`row-${acc.status}`">
+                            <td style="font-weight: 500;">account_{{ acc.account_id }}</td>
+                            <td class="mono">{{ acc.request_count }} / {{ acc.limit }}</td>
+                            <td style="min-width: 120px;">
+                                <div class="progress">
+                                    <div
+                                        class="progress-fill"
+                                        :class="`progress-fill--${acc.status}`"
+                                        :style="{ width: percentage(acc.request_count, acc.limit) + '%' }"
+                                    ></div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge" :class="`badge--${acc.status}`">{{ acc.status }}</span>
+                            </td>
+                            <td
+                                class="timer-cell mono"
+                                :data-account-id="acc.account_id"
+                                :data-reset-at="acc.reset_at || ''"
+                            >
+                                {{ formatResetTime(acc.reset_at) }}
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ═══ HISTORY ═══ -->
+        <div class="card">
+            <div class="card-header">
+                <h2>История запросов</h2>
+            </div>
+            <div class="card-body">
+                <!-- Quick filters -->
+                <div class="quick-row">
+                    <button class="btn btn--error" @click="quickFilter('429')">429</button>
+                    <button class="btn btn--warning" @click="quickFilter('error')">Ошибки</button>
+                    <button class="btn btn--success" @click="quickFilter('success')">Успехи</button>
+                    <button class="btn btn--ghost" @click="resetFilters">Сбросить</button>
+                </div>
+
+                <!-- Filters grid -->
+                <div class="filters">
+                    <!-- Accounts -->
+                    <div class="filter-group">
+                        <div class="filter-label">Аккаунты</div>
+                        <div class="multi-select">
+                            <label v-for="acc in uniqueAccounts" :key="acc">
+                                <input type="checkbox" :value="acc" v-model="filters.accounts" />
+                                account_{{ acc }}
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Models -->
+                    <div class="filter-group">
+                        <div class="filter-label">Модели</div>
+                        <div class="multi-select">
+                            <label v-for="model in uniqueModels" :key="model">
+                                <input type="checkbox" :value="model" v-model="filters.models" />
+                                {{ model }}
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Statuses -->
+                    <div class="filter-group">
+                        <div class="filter-label">Статусы</div>
+                        <div class="multi-select">
+                            <label><input type="checkbox" value="200" v-model="filters.statuses" /> 200 OK</label>
+                            <label><input type="checkbox" value="429" v-model="filters.statuses" /> 429 Rate Limit</label>
+                            <label><input type="checkbox" value="500" v-model="filters.statuses" /> 500 Error</label>
+                            <label><input type="checkbox" value="502" v-model="filters.statuses" /> 502 Bad Gateway</label>
+                            <label><input type="checkbox" value="503" v-model="filters.statuses" /> 503 Service Unavailable</label>
+                        </div>
+                    </div>
+
+                    <!-- Period -->
+                    <div class="filter-group">
+                        <div class="filter-label" for="filter-period">Период</div>
+                        <select id="filter-period" v-model="filters.period">
+                            <option value="all">Все время</option>
+                            <option value="1h">Последний час</option>
+                            <option value="24h">24 часа</option>
+                            <option value="7d">7 дней</option>
+                            <option value="today">Сегодня</option>
+                            <option value="yesterday">Вчера</option>
+                            <option value="custom">Кастомный...</option>
+                        </select>
+                    </div>
+
+                    <!-- Custom period (hidden by default) -->
+                    <div id="custom-period" class="filter-group" :class="{ show: filters.period === 'custom' }">
+                        <div class="filter-label">От</div>
+                        <input type="datetime-local" v-model="filters.dateFrom" />
+                        <div class="filter-label" style="margin-top: var(--space-2);">До</div>
+                        <input type="datetime-local" v-model="filters.dateTo" />
+                    </div>
+
+                    <!-- Input tokens -->
+                    <div class="filter-group">
+                        <div class="filter-label">Input токены</div>
+                        <div class="token-fields">
+                            <input type="number" v-model="filters.inputMin" placeholder="От" />
+                            <input type="number" v-model="filters.inputMax" placeholder="До" />
+                        </div>
+                    </div>
+
+                    <!-- Output tokens -->
+                    <div class="filter-group">
+                        <div class="filter-label">Output токены</div>
+                        <div class="token-fields">
+                            <input type="number" v-model="filters.outputMin" placeholder="От" />
+                            <input type="number" v-model="filters.outputMax" placeholder="До" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Presets -->
+                <div class="presets">
+                    <span class="presets-label">Пресеты:</span>
+                    <button class="btn btn--accent btn--sm" @click="savePreset">Сохранить</button>
+                    <div class="presets-list">
+                        <template v-for="(preset, name) in presets" :key="name">
+                            <span class="preset-chip">
+                                <span @click="loadPreset(name)" style="cursor: pointer;">{{ name }}</span>
+                                <button class="preset-delete" @click="deletePreset(name)" :aria-label="`Удалить пресет ${name}`">✕</button>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="actions">
+                    <button class="btn btn--accent" @click="applyFilters">Применить</button>
+                    <button class="btn btn--ghost" @click="resetFilters">Сбросить</button>
+                </div>
+
+                <!-- Filter summary -->
+                <div class="summary-row" style="margin-top: var(--space-6);">
+                    <div class="summary-card">
+                        <div class="stat-label">Общее токенов</div>
+                        <div class="stat-value stat-value--accent">{{ formatTokens(filteredStats.total) }}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="stat-label">Input токены</div>
+                        <div class="stat-value" style="color: var(--metric-input);">{{ formatTokens(filteredStats.input) }}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="stat-label">Output токены</div>
+                        <div class="stat-value" style="color: var(--metric-output);">{{ formatTokens(filteredStats.output) }}</div>
+                    </div>
+                </div>
+
+                <!-- History table -->
+                <div class="table-wrap" style="margin-bottom: 0; border: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Дата + Время</th>
+                                <th>Аккаунт</th>
+                                <th>Модель</th>
+                                <th>Токены (in / out)</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-if="filteredRequests.length === 0">
+                                <tr>
+                                    <td colspan="6" class="empty">Нет данных о запросах</td>
+                                </tr>
+                            </template>
+                            <template v-else>
+                                <tr v-for="req in paginatedRequests" :key="req.id" :class="getRowClass(req.status_code)">
+                                    <td class="mono text-muted" style="font-size: 0.8rem;">{{ req.id }}</td>
+                                    <td class="mono" style="font-size: 0.8rem;">{{ req.datetime }}</td>
+                                    <td>account_{{ req.account_id }}</td>
+                                    <td>{{ req.model }}</td>
+                                    <td class="mono">
+                                        {{ req.input_tokens || '—' }} / {{ req.output_tokens || '—' }}
+                                    </td>
+                                    <td>
+                                        <span class="badge" :class="`badge--${getStatusClass(req.status_code)}`">{{ req.status_code }}</span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" v-if="totalPages > 1">
+                    <button @click="goToPage(1)" :disabled="currentPage === 1">««</button>
+                    <button @click="prevPage" :disabled="currentPage === 1">«</button>
+                    <span class="page-info">
+                        {{ currentPage }} / {{ totalPages }} ({{ filteredRequests.length }} запросов)
+                    </span>
+                    <button @click="nextPage" :disabled="currentPage === totalPages">»</button>
+                    <button @click="goToPage(totalPages)" :disabled="currentPage === totalPages">»»</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ SSE STATUS ═══ -->
+        <div class="sse-bar">
+            <div class="sse-dot" :class="{ 'sse-dot--on': sseConnected, 'sse-dot--off': !sseConnected && sseStatus.includes('Отключено') }"></div>
+            <span class="sse-label">{{ sseStatus }}</span>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                // ── Data ──
+                const accounts = ref([]);
+                const allRequests = ref([]);
+                const filteredRequests = ref([]);
+                const isFilteringActive = ref(false);
+
+                let eventSource = null;
+                let filterDebounce = null;
+                let timerInterval = null;
+
+                // ── Filters ──
+                const filters = ref({
+                    accounts: [],
+                    models: [],
+                    statuses: [],
+                    period: 'all',
+                    inputMin: '',
+                    inputMax: '',
+                    outputMin: '',
+                    outputMax: '',
+                    dateFrom: '',
+                    dateTo: ''
+                });
+
+                // ── Pagination ──
+                const currentPage = ref(1);
+                const pageSize = ref(50);
+
+                // ── Presets ──
+                const presets = ref(JSON.parse(localStorage.getItem('dashboard_presets') || '{}'));
+
+                // ── Theme ──
+                const isDark = ref(localStorage.getItem('theme') !== 'light');
+                const sseConnected = ref(false);
+                const sseStatus = ref('Подключение...');
+
+                // ── Computed: unique accounts & models ──
+                const uniqueAccounts = computed(() => {
+                    return [...new Set(allRequests.value.map(r => r.account_id))].sort();
+                });
+
+                const uniqueModels = computed(() => {
+                    return [...new Set(allRequests.value.map(r => r.model))].filter(Boolean).sort();
+                });
+
+                // ── Computed: status counts ──
+                const activeCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'active').length;
+                });
+
+                const warningCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'warning').length;
+                });
+
+                const exhaustedCount = computed(() => {
+                    return accounts.value.filter(acc => acc.status === 'exhausted').length;
+                });
+
+                // ── Computed: token stats ──
+                const stats = computed(() => {
+                    const today = countTokensForPeriod(allRequests.value, 'today');
+                    const month = countTokensForPeriod(allRequests.value, 'month');
+                    return { today, month };
+                });
+
+                const filteredStats = computed(() => {
+                    let inputTotal = 0;
+                    let outputTotal = 0;
+                    filteredRequests.value.forEach(req => {
+                        inputTotal += parseInt(req.input_tokens) || 0;
+                        outputTotal += parseInt(req.output_tokens) || 0;
+                    });
+                    return { input: inputTotal, output: outputTotal, total: inputTotal + outputTotal };
+                });
+
+                // ── Computed: pagination ──
+                const paginatedRequests = computed(() => {
+                    const start = (currentPage.value - 1) * pageSize.value;
+                    return filteredRequests.value.slice(start, start + pageSize.value);
+                });
+
+                const totalPages = computed(() => {
+                    return Math.ceil(filteredRequests.value.length / pageSize.value) || 1;
+                });
+
+                // ── Pagination methods ──
+                function nextPage() {
+                    if (currentPage.value < totalPages.value) currentPage.value++;
+                }
+                function prevPage() {
+                    if (currentPage.value > 1) currentPage.value--;
+                }
+                function goToPage(page) {
+                    currentPage.value = page;
+                }
+
+                // ── Formatting ──
+                function formatTokens(num) {
+                    return num.toLocaleString('ru-RU');
+                }
+
+                function countTokensForPeriod(requests, period) {
+                    const now = new Date();
+                    let inputTotal = 0;
+                    let outputTotal = 0;
+
+                    requests.forEach(req => {
+                        const reqTime = parseDateTime(req.datetime);
+                        if (!reqTime) return;
+
+                        let match = false;
+
+                        if (period === 'today') {
+                            // Сегодня = те же сутки UTC (00:00 UTC — 23:59 UTC)
+                            const todayStart = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+                            match = reqTime >= todayStart;
+                        } else if (period === 'month') {
+                            // За 30 дней от сейчас
+                            const monthAgo = Math.floor(Date.now() / 1000) - 2592000;
+                            match = reqTime >= monthAgo;
+                        }
+
+                        if (match) {
+                            inputTotal += parseInt(req.input_tokens) || 0;
+                            outputTotal += parseInt(req.output_tokens) || 0;
+                        }
+                    });
+                    return { input: inputTotal, output: outputTotal, total: inputTotal + outputTotal };
+                }
+
+                function parseDateTime(datetimeStr) {
+                    if (!datetimeStr) return 0;
+                    try {
+                        const parts = datetimeStr.split(' ');
+                        const dateParts = parts[0].split('.');
+                        const timeParts = parts[1] ? parts[1].split(':') : ['0', '0'];
+                        const day = parseInt(dateParts[0]);
+                        const month = parseInt(dateParts[1]) - 1;
+                        const year = parseInt(dateParts[2]);
+                        const hour = parseInt(timeParts[0]);
+                        const minute = parseInt(timeParts[1]);
+                        return Math.floor(new Date(year, month, day, hour, minute).getTime() / 1000);
+                    } catch (e) {
+                        console.error('parseDateTime error:', e, datetimeStr);
+                        return 0;
+                    }
+                }
+
+                function formatTime(seconds) {
+                    if (seconds <= 0) return "Сейчас";
+                    const h = Math.floor(seconds / 3600);
+                    const m = Math.floor((seconds % 3600) / 60);
+                    const s = seconds % 60;
+                    if (h > 0) return `${h}ч ${m}м`;
+                    if (m > 0) return `${m}м ${s}с`;
+                    return `${s}с`;
+                }
+
+                function formatResetTime(resetAt) {
+                    if (!resetAt) return '—';
+                    const now = Math.floor(Date.now() / 1000);
+                    const seconds = parseInt(resetAt) - now;
+                    return seconds > 0 ? formatTime(seconds) : 'Сейчас';
+                }
+
+                function percentage(current, limit) {
+                    return Math.min(100, (current / limit) * 100);
+                }
+
+                function getRowClass(statusCode) {
+                    if (statusCode === 200) return 'row-active';
+                    if (statusCode === 429) return 'row-exhausted';
+                    return 'row-warning';
+                }
+
+                function getStatusClass(statusCode) {
+                    if (statusCode === 200) return 'active';
+                    if (statusCode === 429) return 'exhausted';
+                    return 'warning';
+                }
+
+                // ── Filters ──
+                function applyFilters() {
+                    const f = filters.value;
+                    currentPage.value = 1;
+                    isFilteringActive.value = !!(
+                        f.accounts.length || f.models.length || f.statuses.length ||
+                        f.period !== 'all' || f.inputMin || f.inputMax || f.outputMin || f.outputMax
+                    );
+                    filteredRequests.value = allRequests.value.filter(req => {
+                        if (f.accounts.length && !f.accounts.includes(req.account_id)) return false;
+                        if (f.models.length && !f.models.includes(req.model)) return false;
+                        if (f.statuses.length && !f.statuses.includes(req.status_code.toString())) return false;
+
+                        const now = Date.now() / 1000;
+                        const periods = { '1h': 3600, '24h': 86400, '7d': 604800 };
+                        if (f.period !== 'all' && f.period !== 'custom' && f.period !== 'today' && f.period !== 'yesterday' && periods[f.period]) {
+                            const reqTime = parseDateTime(req.datetime);
+                            if (now - reqTime > periods[f.period]) return false;
+                        }
+
+                        if (f.period === 'today') {
+                            const reqTime = parseDateTime(req.datetime);
+                            const now = new Date();
+                            const todayStart = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+                            if (reqTime < todayStart) return false;
+                        }
+
+                        if (f.period === 'yesterday') {
+                            const reqTime = parseDateTime(req.datetime);
+                            const now = new Date();
+                            const yesterdayStart = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1) / 1000);
+                            const yesterdayEnd = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+                            if (reqTime < yesterdayStart || reqTime >= yesterdayEnd) return false;
+                        }
+
+                        if (f.period === 'custom') {
+                            const reqTime = parseDateTime(req.datetime);
+                            if (!reqTime) return false;
+
+                            if (f.dateFrom) {
+                                const from = new Date(f.dateFrom).getTime() / 1000;
+                                if (!isNaN(from) && reqTime < from) return false;
+                            }
+                            if (f.dateTo) {
+                                const to = new Date(f.dateTo).getTime() / 1000 + 59;
+                                if (!isNaN(to) && reqTime > to) return false;
+                            }
+                        }
+
+                        if (f.inputMin && req.input_tokens < parseInt(f.inputMin)) return false;
+                        if (f.inputMax && req.input_tokens > parseInt(f.inputMax)) return false;
+                        if (f.outputMin && req.output_tokens < parseInt(f.outputMin)) return false;
+                        if (f.outputMax && req.output_tokens > parseInt(f.outputMax)) return false;
+
+                        return true;
+                    });
+                }
+
+                function scheduleApplyFilters() {
+                    clearTimeout(filterDebounce);
+                    filterDebounce = setTimeout(applyFilters, 200);
+                }
+
+                function resetFilters() {
+                    filters.value = {
+                        accounts: [],
+                        models: [],
+                        statuses: [],
+                        period: 'all',
+                        inputMin: '',
+                        inputMax: '',
+                        outputMin: '',
+                        outputMax: '',
+                        dateFrom: '',
+                        dateTo: ''
+                    };
+                    isFilteringActive.value = false;
+                    currentPage.value = 1;
+                    filteredRequests.value = allRequests.value;
+                }
+
+                function quickFilter(type) {
+                    resetFilters();
+                    if (type === '429') {
+                        filters.value.statuses = ['429'];
+                    } else if (type === 'error') {
+                        filters.value.statuses = ['429', '500', '502', '503'];
+                    } else if (type === 'success') {
+                        filters.value.statuses = ['200'];
+                    }
+                    applyFilters();
+                }
+
+                // ── Presets ──
+                function savePreset() {
+                    const name = prompt('Название пресета:');
+                    if (!name) return;
+                    presets.value[name] = { ...filters.value };
+                    localStorage.setItem('dashboard_presets', JSON.stringify(presets.value));
+                }
+
+                function loadPreset(name) {
+                    const preset = presets.value[name];
+                    if (!preset) return;
+                    filters.value = { ...preset };
+                    applyFilters();
+                }
+
+                function deletePreset(name) {
+                    if (!confirm(`Удалить пресет "${name}"?`)) return;
+                    delete presets.value[name];
+                    localStorage.setItem('dashboard_presets', JSON.stringify(presets.value));
+                }
+
+                // ── Theme ──
+                function toggleTheme() {
+                    isDark.value = !isDark.value;
+                    document.documentElement.setAttribute('data-theme', isDark.value ? 'dark' : 'light');
+                    localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+                }
+
+                function initTheme() {
+                    const saved = localStorage.getItem('theme') || 'dark';
+                    isDark.value = saved === 'dark';
+                    document.documentElement.setAttribute('data-theme', saved);
+                }
+
+                // ── Data update ──
+                function updateRequests(newRequests) {
+                    if (!newRequests || newRequests.length === 0) return;
+                    allRequests.value = newRequests;
+                }
+
+                // ── SSE ──
+                function connectSSE() {
+                    eventSource = new EventSource('/sse/stats');
+                    eventSource.onopen = () => {
+                        sseConnected.value = true;
+                        sseStatus.value = 'Подключено (real-time)';
+                    };
+                    eventSource.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        const statsData = data.stats || data;
+                        const requests = data.requests || [];
+                        accounts.value = statsData;
+                        updateRequests(requests);
+                        if (!isFilteringActive.value) {
+                            filteredRequests.value = allRequests.value;
+                        }
+                    };
+                    eventSource.onerror = () => {
+                        sseConnected.value = false;
+                        sseStatus.value = 'Отключено (перезагрузка страницы)';
+                        eventSource.close();
+                        setTimeout(connectSSE, 5000);
+                    };
+                }
+
+                // ── Timers ──
+                function updateTimers() {
+                    document.querySelectorAll('.timer-cell[data-reset-at]').forEach(el => {
+                        const resetAt = el.getAttribute('data-reset-at');
+                        if (resetAt && resetAt !== '') {
+                            const seconds = parseInt(resetAt) - Math.floor(Date.now() / 1000);
+                            el.textContent = seconds > 0 ? formatTime(seconds) : 'Сейчас';
+                        }
+                    });
+                }
+
+                // ── Watchers ──
+                watch(() => filters.value.accounts, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.models, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.statuses, scheduleApplyFilters, { deep: true });
+                watch(() => filters.value.period, scheduleApplyFilters);
+                watch(() => filters.value.inputMin, scheduleApplyFilters);
+                watch(() => filters.value.inputMax, scheduleApplyFilters);
+                watch(() => filters.value.outputMin, scheduleApplyFilters);
+                watch(() => filters.value.outputMax, scheduleApplyFilters);
+
+                // ── Lifecycle ──
+                onMounted(() => {
+                    initTheme();
+                    connectSSE();
+                    timerInterval = setInterval(updateTimers, 1000);
+                });
+
+                onUnmounted(() => {
+                    if (eventSource) eventSource.close();
+                    if (timerInterval) clearInterval(timerInterval);
+                    clearTimeout(filterDebounce);
+                });
+
+                return {
+                    accounts,
+                    allRequests,
+                    filteredRequests,
+                    filters,
+                    presets,
+                    isDark,
+                    sseConnected,
+                    sseStatus,
+                    uniqueAccounts,
+                    uniqueModels,
+                    activeCount,
+                    warningCount,
+                    exhaustedCount,
+                    stats,
+                    filteredStats,
+                    currentPage,
+                    pageSize,
+                    paginatedRequests,
+                    totalPages,
+                    nextPage,
+                    prevPage,
+                    goToPage,
+                    formatTokens,
+                    formatTime,
+                    formatResetTime,
+                    percentage,
+                    getRowClass,
+                    getStatusClass,
+                    applyFilters,
+                    resetFilters,
+                    quickFilter,
+                    savePreset,
+                    loadPreset,
+                    deletePreset,
+                    toggleTheme
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
