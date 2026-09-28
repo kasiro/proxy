@@ -37,7 +37,7 @@ NIX_CC='/nix/store/z4c6k0mrlkwl3s4w9ysxc8vq1wylm3ms-gcc-wrapper-15.3.0'
 export NIX_CC
 NIX_CC_WRAPPER_TARGET_HOST_x86_64_unknown_linux_gnu='1'
 export NIX_CC_WRAPPER_TARGET_HOST_x86_64_unknown_linux_gnu
-NIX_CFLAGS_COMPILE=' -frandom-seed=fkf6smsnfc -isystem /nix/store/d64q19q1xjdwfhqx6czvrjgrhq0n3lcc-python3-3.14.7/include -isystem /nix/store/d64q19q1xjdwfhqx6czvrjgrhq0n3lcc-python3-3.14.7/include'
+NIX_CFLAGS_COMPILE=' -frandom-seed=l9jvlcz7jd -isystem /nix/store/d64q19q1xjdwfhqx6czvrjgrhq0n3lcc-python3-3.14.7/include -isystem /nix/store/d64q19q1xjdwfhqx6czvrjgrhq0n3lcc-python3-3.14.7/include'
 export NIX_CFLAGS_COMPILE
 NIX_ENFORCE_NO_NATIVE='1'
 export NIX_ENFORCE_NO_NATIVE
@@ -189,8 +189,8 @@ export propagatedNativeBuildInputs
 declare -a propagatedTargetDepFiles=('propagated-target-target-deps' )
 shell='/nix/store/svx59425zxp552p2b8gm11qj5r09b56i-bash-5.3p15/bin/bash'
 export shell
-shellHook='if [ -z "$DIRENV_IN_ENVRC" ]; then
-  echo "Добро пожаловать в среду разработки!";
+shellHook='echo "Добро пожаловать в среду разработки!";
+if [ -z "$DIRENV_IN_ENVRC" ]; then
   ./setup.sh
 fi
 '
