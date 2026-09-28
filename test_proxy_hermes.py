@@ -35,6 +35,8 @@ MODELS_LIST = [
     {"id": "muse-spark-1.3-contributor-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "muse-spark-1.2-contributor-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "mimo-v2.5-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "mimo-v2.6-flash-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
+    {"id": "jev-1.13-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "ling-3.0-flash-fin-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "nemotron-3-ultra-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
     {"id": "nemotron-3.5-lightning-free", "object": "model", "created": 1788893105, "owned_by": "opencode"},
@@ -181,7 +183,7 @@ OPENCODE_RESPONSES_URL = "https://opencode.ai/zen/v1/responses"
 
 def _load_zen_key() -> str:
     """Ключ OPENCODE_ZEN_API_KEY из env (профиль jarvis). Значение не логировать."""
-    key = os.environ.get("OPENCODE_ZEN_API_KEY", "") or os.environ.get("OPENCODE_API_KEY", "")
+    key = os.environ.get("OPENCODE_ZEN_API_KEY", "") or os.environ.get("OPENCODE_API_KEY", "") or 'oc_sk_9aa7c04a4742_gb7ovR4G1T6SOw4KEvMUNER0G7oPxu2P'
     if key:
         return key
     # Фолбэк: .env профиля jarvis (только чтение значения в память, без логов)

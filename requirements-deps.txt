@@ -1,2 +1,4 @@
 requests
 sseclient-py
+fastapi
+uvicorn

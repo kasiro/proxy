@@ -300,28 +300,29 @@ async def proxy(request: Request):
     input_tokens = sum(len(msg.get("content", "")) for msg in client_data.get("messages", []))
     output_tokens = 0  # Будет посчитано из ответа
     account_id = get_current_account_id()
-    
+    current_account_id = 'account_' + session.headers['new-api-user'] # type: ignore
+
     for attempt in range(len(ACCOUNTS)):
         resp = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True))
         
-        if resp.status_code == 429:
-            print(f"[retry] Аккаунт {current_acc_index + 1} вернул 429 (попытка {attempt + 1}/{len(ACCOUNTS)})")
+        if resp.status_code in [429, 401]:
+            print(f"[retry] Аккаунт {current_account_id} ({current_acc_index + 1}) вернул {resp.status_code} (попытка {attempt + 1}/{len(ACCOUNTS)})")
             if DEBUG_MODE:
-                print(f"[proxy] Response: 429 (аккаунт {current_acc_index + 1})", flush=True)
+                print(f"[proxy] Response: {resp.status_code} (аккаунт {current_acc_index + 1})", flush=True)
             # Запись 429 в статистику
             if STATS_ENABLED:
-                await record_request_async(account_id, 429, model, input_tokens, output_tokens)  # type: ignore
+                await record_request_async(account_id, resp.status_code, model, input_tokens, output_tokens)  # type: ignore
             
             if attempt < len(ACCOUNTS) - 1:
                 switch_account()
                 continue
             else:
-                print("[retry] Все аккаунты исчерпаны, возвращаем 429 клиенту")
+                print(f"[retry] Все аккаунты исчерпаны, возвращаем {resp.status_code} клиенту")
                 if DEBUG_MODE:
-                    print(f"[proxy] Response: 429 (все аккаунты исчерпаны)", flush=True)
+                    print(f"[proxy] Response: {resp.status_code} (все аккаунты исчерпаны)", flush=True)
                 return Response(
-                    content=json.dumps({"error": "rate_limit_exceeded", "detail": "Все аккаунты вернули 429"}),
-                    status_code=429
+                    content=json.dumps({"error": "rate_limit_exceeded", "detail": f"Все аккаунты вернули {resp.status_code}"}),
+                    status_code=resp.status_code
                 )
         if resp.status_code == 200:
             if DEBUG_MODE:
