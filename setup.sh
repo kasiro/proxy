@@ -27,7 +27,7 @@ fi
 cd "$SCRIPT_DIR/opencode_compat_proxy"
 echo ""
 echo "=== Проект 2: opencode_compat_proxy ==="
-if [ ! -d "opencode_compat_proxy/.venv" ]; then
+if [ ! -d ".venv" ]; then
     echo "Создаю venv..."
     uv venv .venv
     echo "Устанавливаю зависимости из opencode_compat_proxy/requirements-deps.txt..."
