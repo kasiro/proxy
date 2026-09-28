@@ -16,10 +16,13 @@ cd "$SCRIPT_DIR"
 if [ ! -d ".venv" ]; then
     echo "Создаю venv..."
     uv venv .venv
+    echo "Устанавливаю зависимости из requirements-deps.txt..."
+    uv pip install --python .venv/bin/python -r requirements-deps.txt
+    echo "Готово."
+else
+    echo "test_revers_proxy venv is ready."
 fi
-echo "Устанавливаю зависимости из requirements-deps.txt..."
-uv pip install --python .venv/bin/python -r requirements-deps.txt
-echo "Готово."
+
 
 cd "$SCRIPT_DIR/opencode_compat_proxy"
 echo ""
@@ -27,10 +30,12 @@ echo "=== Проект 2: opencode_compat_proxy ==="
 if [ ! -d "opencode_compat_proxy/.venv" ]; then
     echo "Создаю venv..."
     uv venv .venv
+    echo "Устанавливаю зависимости из opencode_compat_proxy/requirements-deps.txt..."
+    uv pip install --python .venv/bin/python -r requirements.txt
+    echo "Готово."
+else
+    echo "test_revers_proxy/opencode_compat_proxy venv is ready."
 fi
-
-uv pip install --python .venv/bin/python -r requirements.txt
-echo "Готово."
 
 echo ""
 echo "=== Все зависимости установлены ==="
