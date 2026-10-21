@@ -289,7 +289,7 @@ def main():
     # proxy: output_to_console=False — логи только в файл (кроме [retry])
     proxy_thread = threading.Thread(
         target=stream_output,
-        args=(proxy_process, "proxy", logger, False),  # Только в файл
+        args=(proxy_process, "proxy", logger, True),  # Только в файл
         daemon=True,
         name="proxy-output"
     )

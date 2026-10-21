@@ -300,13 +300,13 @@ async def proxy(request: Request):
     input_tokens = sum(len(msg.get("content", "")) for msg in client_data.get("messages", []))
     output_tokens = 0  # Будет посчитано из ответа
     account_id = get_current_account_id()
-    current_account_id = 'account_' + session.headers['new-api-user'] # type: ignore
+    current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
 
     for attempt in range(len(ACCOUNTS)):
         resp = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True))
         
-        if resp.status_code in [429, 401]:
-            print(f"[retry] Аккаунт {current_account_id} ({current_acc_index + 1}) вернул {resp.status_code} (попытка {attempt + 1}/{len(ACCOUNTS)})")
+        if resp.status_code != 200:
+            print(f"[retry] Аккаунт {current_account_id} ({current_acc_index + 1}) вернул {resp.status_code} ({json.loads(resp.content)['message']}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
             if DEBUG_MODE:
                 print(f"[proxy] Response: {resp.status_code} (аккаунт {current_acc_index + 1})", flush=True)
             # Запись 429 в статистику
@@ -315,6 +315,7 @@ async def proxy(request: Request):
             
             if attempt < len(ACCOUNTS) - 1:
                 switch_account()
+                current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
                 continue
             else:
                 print(f"[retry] Все аккаунты исчерпаны, возвращаем {resp.status_code} клиенту")
@@ -329,7 +330,7 @@ async def proxy(request: Request):
                 print(f"[proxy] Response: 200 OK (аккаунт {current_acc_index + 1})", flush=True)
             break  # Нормальный ответ — выходим из цикла
 
-        if resp.status_code not in [200, 429]:
+        if resp.status_code not in [200]:
             # Запись других ошибок
             if STATS_ENABLED:
                 await record_request_async(account_id, resp.status_code, model, input_tokens, output_tokens)  # type: ignore
