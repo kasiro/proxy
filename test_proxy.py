@@ -148,9 +148,9 @@ def switch_account():
         current_acc_index = (current_acc_index + 1) % len(ACCOUNTS)
         acc_id = ACCOUNT_IDS[current_acc_index]
 
-        if STATS_ENABLED:
-            if not is_account_available(acc_id):  # type: ignore
-                continue  # Пропускать исчерпанный
+        # if STATS_ENABLED:
+        #     if not is_account_available(acc_id):  # type: ignore
+        #         continue  # Пропускать исчерпанный
 
         # Нашли доступный — обновляем session
         parsed = curl_to_python(ACCOUNTS[current_acc_index])
@@ -306,7 +306,11 @@ async def proxy(request: Request):
         resp = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True))
         
         if resp.status_code != 200:
-            print(f"[retry] Аккаунт {current_account_id} ({current_acc_index + 1}) вернул {resp.status_code} ({json.loads(resp.content)['message']}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
+            json_ = json.loads(resp.content)
+            mess = json_.get('message', 'None')
+            if mess == 'None':
+                mess = json_.get('error', 'None')
+            print(f"[retry] Аккаунт {current_account_id} ({current_acc_index + 1}) вернул {resp.status_code} ({mess}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
             if DEBUG_MODE:
                 print(f"[proxy] Response: {resp.status_code} (аккаунт {current_acc_index + 1})", flush=True)
             # Запись 429 в статистику

@@ -8,18 +8,18 @@ curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
   -H 'accept: text/event-stream' \
   -H 'accept-language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7' \
   -H 'content-type: application/json' \
-  -b 'tmr_lvid=17da0594be27b1c4b50aa898c80442c7; tmr_lvidTS=1790271333127; _ym_uid=1790271334319132896; _ym_d=1790271334; session=MTc5MDI3MTM3NXxEWDhFQVFMX2dBQUJFQUVRQUFEX25mLUFBQVVHYzNSeWFXNW5EQW9BQ0hWelpYSnVZVzFsQm5OMGNtbHVad3dVQUJKMVgyRXlOVGhtTm1ZM05qWTVNVE0zWVdNR2MzUnlhVzVuREFZQUJISnZiR1VEYVc1MEJBSUFBZ1p6ZEhKcGJtY01DQUFHYzNSaGRIVnpBMmx1ZEFRQ0FBSUdjM1J5YVc1bkRBY0FCV2R5YjNWd0JuTjBjbWx1Wnd3SkFBZGtaV1poZFd4MEJuTjBjbWx1Wnd3RUFBSnBaQU5wYm5RRUJBRC1ORFk9fMIRcO4-L69b0iXesHVLVkVZM8U3l6o63qSykHDrZVYk; OdiRouter-authenticated=1; _ym_isad=1' \
+  -b 'tmr_lvid=17da0594be27b1c4b50aa898c80442c7; tmr_lvidTS=1790271333127; _ym_uid=1790271334319132896; _ym_d=1790271334; _ym_isad=1; mdd=0; session=MTc5Mjk0MTEyNnxEWDhFQVFMX2dBQUJFQUVRQUFEX25mLUFBQVVHYzNSeWFXNW5EQVlBQkhKdmJHVURhVzUwQkFJQUFnWnpkSEpwYm1jTUNBQUdjM1JoZEhWekEybHVkQVFDQUFJR2MzUnlhVzVuREFjQUJXZHliM1Z3Qm5OMGNtbHVad3dKQUFka1pXWmhkV3gwQm5OMGNtbHVad3dFQUFKcFpBTnBiblFFQkFELU5EWUdjM1J5YVc1bkRBb0FDSFZ6WlhKdVlXMWxCbk4wY21sdVp3d1VBQkoxWDJFeU5UaG1ObVkzTmpZNU1UTTNZV009fOce4Hw6auW-YpaPk5UNEZEUSLeZGLCzszhgY7H16Szt; OdiRouter-authenticated=1' \
   -H 'new-api-user: 6683' \
   -H 'origin: https://odirouter.ai' \
   -H 'priority: u=1, i' \
   -H 'referer: https://odirouter.ai/dashboard/playground' \
-  -H 'sec-ch-ua: "Chromium";v="153", "Not_A Brand";v="8"' \
+  -H 'sec-ch-ua: "Chromium";v="155", "Not(A:Brand";v="24"' \
   -H 'sec-ch-ua-mobile: ?0' \
   -H 'sec-ch-ua-platform: "Linux"' \
   -H 'sec-fetch-dest: empty' \
   -H 'sec-fetch-mode: cors' \
   -H 'sec-fetch-site: same-origin' \
-  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36' \
+  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36' \
   -H 'x-starry-current-page-id: playground_page' \
   -H 'x-starry-current-page-name: playground_page' \
   -H 'x-starry-current-page-url: https://odirouter.ai/dashboard/playground' \
@@ -27,9 +27,9 @@ curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
   -H 'x-starry-ref-page-id: home_page' \
   -H 'x-starry-ref-page-name: home_page' \
   -H 'x-starry-ref-page-url: https://odirouter.ai/dashboard/home' \
-  -H 'x-starry-session-id: c1b131d1-d249-490a-aae6-904c95db4cf6' \
-  -H 'x-starry-window-id: 8518f21c-9a81-4aa8-8884-57afc9f1a6f8' \
-  --data-raw '{"group":"default","messages":[{"content":"привет?","role":"user"}],"model":"free-qwen3.5-plus","stream":true}'
+  -H 'x-starry-session-id: 61d039a0-f414-4444-b719-28a8178c90b6' \
+  -H 'x-starry-window-id: 7bdede60-396d-4b52-9448-b0ccd8a8abd0' \
+  --data-raw '{"group":"default","messages":[{"content":"hello?","role":"user"}],"model":"free-qwen3.5-plus","stream":true}'
 """,
     """
 curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
