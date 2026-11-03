@@ -247,4 +247,60 @@ curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
   -H 'x-starry-session-id: c1b131d1-d249-490a-aae6-904c95db4cf6' \
   -H 'x-starry-window-id: 8518f21c-9a81-4aa8-8884-57afc9f1a6f8' \
   --data-raw '{"group":"default","messages":[{"content":"привет?","role":"user"}],"model":"free-qwen3.5-plus","stream":true}'""",
+"""
+curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
+  -H 'accept: text/event-stream' \
+  -H 'accept-language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7' \
+  -H 'content-type: application/json' \
+  -b '_ym_uid=1790271334319132896; _ym_d=1793270505; _ym_isad=1; mdd=0; session=MTc5MzI3MjIwMHxEWDhFQVFMX2dBQUJFQUVRQUFEX25mLUFBQVVHYzNSeWFXNW5EQVFBQW1sa0EybHVkQVFFQVA1WmxBWnpkSEpwYm1jTUNnQUlkWE5sY201aGJXVUdjM1J5YVc1bkRCUUFFblZmWm1FM05UVTNObVUxWlRabE1qY3hZUVp6ZEhKcGJtY01CZ0FFY205c1pRTnBiblFFQWdBQ0JuTjBjbWx1Wnd3SUFBWnpkR0YwZFhNRGFXNTBCQUlBQWdaemRISnBibWNNQndBRlozSnZkWEFHYzNSeWFXNW5EQWtBQjJSbFptRjFiSFE9fFWQn5QuKUIGnAaUym3mWkSYJh3UsEFeYyf3UFI9pCap; OdiRouter-authenticated=1' \
+  -H 'new-api-user: 11466' \
+  -H 'origin: https://odirouter.ai' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://odirouter.ai/dashboard/playground' \
+  -H 'sec-ch-ua: "Chromium";v="155", "Not(A:Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Linux"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36' \
+  -H 'x-starry-current-page-id: playground_page' \
+  -H 'x-starry-current-page-name: playground_page' \
+  -H 'x-starry-current-page-url: https://odirouter.ai/dashboard/playground' \
+  -H 'x-starry-distinct-id: 1d95acc2-594f-417d-8f6c-0fbbd8078b7e' \
+  -H 'x-starry-ref-page-id: model_page' \
+  -H 'x-starry-ref-page-name: model_page' \
+  -H 'x-starry-ref-page-url: https://odirouter.ai/dashboard/models' \
+  -H 'x-starry-session-id: 9347771b-b504-468b-bb8a-42af02622fd7' \
+  -H 'x-starry-window-id: 0feac8be-2bf6-4cec-9c54-f4623642a9d0' \
+  --data-raw '{"group":"default","messages":[{"content":"привет?","role":"user"}],"model":"free-gemini-3.1-flash-lite","stream":true}'
+""",
+"""
+curl --url 'https://odirouter.ai/api/relay/pg/chat/completions' \
+  -H 'accept: text/event-stream' \
+  -H 'accept-language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7' \
+  -H 'content-type: application/json' \
+  -b '_ym_uid=1790271334319132896; _ym_d=1793270505; _ym_isad=1; mdd=0; session=MTc5MzI3MjQ5NnxEWDhFQVFMX2dBQUJFQUVRQUFEX25mLUFBQVVHYzNSeWFXNW5EQVFBQW1sa0EybHVkQVFFQVA1WmxnWnpkSEpwYm1jTUNnQUlkWE5sY201aGJXVUdjM1J5YVc1bkRCUUFFblZmTjJFMk5ESmlNemRrWkRVNU4yWTNaQVp6ZEhKcGJtY01CZ0FFY205c1pRTnBiblFFQWdBQ0JuTjBjbWx1Wnd3SUFBWnpkR0YwZFhNRGFXNTBCQUlBQWdaemRISnBibWNNQndBRlozSnZkWEFHYzNSeWFXNW5EQWtBQjJSbFptRjFiSFE9fMhU4lBE2v0LfbHAx3vBN5vzpOQZ8pxPyon1JK_LgPqN; OdiRouter-authenticated=1' \
+  -H 'new-api-user: 11467' \
+  -H 'origin: https://odirouter.ai' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://odirouter.ai/dashboard/playground' \
+  -H 'sec-ch-ua: "Chromium";v="155", "Not(A:Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Linux"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36' \
+  -H 'x-starry-current-page-id: playground_page' \
+  -H 'x-starry-current-page-name: playground_page' \
+  -H 'x-starry-current-page-url: https://odirouter.ai/dashboard/playground' \
+  -H 'x-starry-distinct-id: 1d95acc2-594f-417d-8f6c-0fbbd8078b7e' \
+  -H 'x-starry-ref-page-id: model_page' \
+  -H 'x-starry-ref-page-name: model_page' \
+  -H 'x-starry-ref-page-url: https://odirouter.ai/dashboard/models' \
+  -H 'x-starry-session-id: 9347771b-b504-468b-bb8a-42af02622fd7' \
+  -H 'x-starry-window-id: 0feac8be-2bf6-4cec-9c54-f4623642a9d0' \
+  --data-raw '{"group":"default","messages":[{"content":"привет?","role":"user"}],"model":"free-qwen3.5-plus","stream":true}'
+""",
 ]
