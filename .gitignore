@@ -21,3 +21,8 @@ wheels/
 # Log files
 *.log
 *.db
+
+# SQLite database files (explicit)
+stats.db
+stats.db-shm
+stats.db-wal
