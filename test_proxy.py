@@ -2,6 +2,7 @@ from sys import exit
 import re
 import json
 import os
+from types import NoneType
 from urllib.parse import urlparse
 from sseclient import SSEClient # type: ignore
 from pprint import pprint
@@ -52,12 +53,12 @@ def strip_think_tags(text: str) -> str:
     return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
 
 
-def safe_print_payload(payload: dict) -> None:
+def safe_print_payload(payload: dict, hide_tools: bool = True) -> None:
     """Безопасный вывод payload — исключает tools и системные промпты."""
     safe_copy = payload.copy()
     
     # Удаляем tools если есть
-    if 'tools' in safe_copy:
+    if 'tools' in safe_copy and hide_tools:
         safe_copy['tools'] = '<REDACTED>'
     
     # Фильтруем messages, убирая сообщения с role='system'
@@ -259,6 +260,8 @@ def build_system_prompt(tools: list, client_data: dict) -> str:
 
     return prompt
 
+def not_is_None(obj) -> bool:
+    return not obj is None and not obj is NoneType
 
 @app.post('/v1/chat/completions')
 async def proxy(request: Request):
@@ -275,6 +278,7 @@ async def proxy(request: Request):
     # Пробросить tools в payload для совместимости с upstream API
     tools = client_data.get('tools', []) if client_data else []
     if tools:
+        # добавить фильтрацию tools при надобности
         payload['tools'] = tools
 
     # Построить system prompt с инструментами
@@ -290,14 +294,20 @@ async def proxy(request: Request):
         payload['messages'].insert(0, {'role': 'system', 'content': system_prompt})
 
     if DEBUG_MODE:
-        safe_print_payload(payload)
-        print(f"[proxy] Request to {TARGET_URL}", flush=True)
+        safe_print_payload(client_data)
+        # safe_print_payload(payload)
 
     # --- Retry при 429: перебираем ВСЕ аккаунты по кругу ---
     resp = None
     # Извлекаем модель и токены (до цикла retry)
     model = client_data.get("model", "unknown")
-    input_tokens = sum(len(msg.get("content", "")) for msg in client_data.get("messages", []))
+    input_tokens = 0
+    for msg in client_data.get("messages", []):
+        if not_is_None(msg):
+            content = msg.get('content', '')
+            if not_is_None(content):
+                input_tokens += len(content)
+
     output_tokens = 0  # Будет посчитано из ответа
     account_id = get_current_account_id()
     current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
