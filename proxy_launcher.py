@@ -4,7 +4,6 @@ Launcher для запуска трёх uvicorn-процессов: proxy, compa
 
 Запускает:
   - proxy: uvicorn на порту 5000 (test_proxy:app из корня проекта)
-  - opencode_compat_proxy: uvicorn на порту 9625 (proxy:app из папки opencode_compat_proxy/)
   - dashboard: uvicorn на порту 5001 (dashboard:app из корня проекта)
 
 Все процессы работают в фоне, основной процесс ждёт их завершения.
@@ -13,8 +12,6 @@ Launcher для запуска трёх uvicorn-процессов: proxy, compa
 Использование:
     python proxy_launcher.py                                 # по умолчанию: test_proxy:app + opencode_compat_proxy/proxy:app
     python proxy_launcher.py --proxy-app custom:app          # кастомное proxy приложение
-    python proxy_launcher.py --compat-app custom:app         # кастомное compat приложение
-    python proxy_launcher.py --compat-cwd /path/to/dir       # кастомная директория для compat
     python proxy_launcher.py --dashboard                     # запустить также dashboard на порту 5001
     python proxy_launcher.py --dashboard --dashboard-port 8080  # dashboard на кастомном порту
 """
@@ -31,7 +28,7 @@ from pathlib import Path
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Запуск двух uvicorn-процессов reverse proxy"
+        description="Запуск uvicorn-процесса reverse proxy"
     )
     parser.add_argument(
         "--proxy-app",
@@ -40,34 +37,10 @@ def parse_args():
         help="Uvicorn приложение для proxy в формате module:app (по умолчанию: test_proxy:app)"
     )
     parser.add_argument(
-        "--compat-app",
-        type=str,
-        default="proxy:app",
-        help="Uvicorn приложение для compat proxy в формате module:app (по умолчанию: proxy:app)"
-    )
-    parser.add_argument(
-        "--compat-cwd",
-        type=str,
-        default="opencode_compat_proxy",
-        help="Рабочая директория для compat proxy (по умолчанию: opencode_compat_proxy)"
-    )
-    parser.add_argument(
         "--proxy-port",
         type=int,
         default=5000,
         help="Порт для proxy (по умолчанию: 5000)"
-    )
-    parser.add_argument(
-        "--compat-port",
-        type=int,
-        default=9625,
-        help="Порт для opencode_compat_proxy (по умолчанию: 9625)"
-    )
-    parser.add_argument(
-        "--upstream-url",
-        type=str,
-        default=None,
-        help="UPSTREAM_URL для compat proxy (по умолчанию: http://127.0.0.1:<proxy-port>)"
     )
     parser.add_argument(
         "--reload",
@@ -195,23 +168,16 @@ def main():
     logger = setup_logging(workdir)
     logger.info("Рабочая директория: %s", workdir)
     logger.info("Proxy приложение: %s", args.proxy_app)
-    logger.info("Compat приложение: %s (из %s)", args.compat_app, args.compat_cwd)
     
     # Определяем пути к venv
     proxy_venv = workdir / ".venv"
-    compat_venv = workdir / args.compat_cwd / ".venv"
     
     # Проверяем существование venv
     if not proxy_venv.exists():
         logger.error("Proxy venv не найден: %s", proxy_venv)
         sys.exit(1)
     
-    if not compat_venv.exists():
-        logger.error("Compat venv не найден: %s", compat_venv)
-        sys.exit(1)
-    
-    logger.info("Proxy venv: %s", proxy_venv)
-    logger.info("Compat venv: %s", compat_venv)
+        logger.info("Proxy venv: %s", proxy_venv)
     
     # Определяем путь к dashboard venv
     dashboard_venv = workdir / ".venv"
@@ -219,7 +185,6 @@ def main():
     
     # Формируем команды для uvicorn с полными путями
     proxy_uvicorn = proxy_venv / "bin" / "uvicorn"
-    compat_uvicorn = compat_venv / "bin" / "uvicorn"
     dashboard_uvicorn = dashboard_venv / "bin" / "uvicorn"
     
     proxy_cmd = [
@@ -236,26 +201,8 @@ def main():
     if args.debug:
         proxy_env["PROXY_DEBUG"] = "1"
     
-    upstream_url = args.upstream_url or f"http://127.0.0.1:{args.proxy_port}"
-    compat_env = os.environ.copy()
-    compat_env["UPSTREAM_URL"] = upstream_url
-    
-    compat_cmd = [
-        str(compat_uvicorn),
-        args.compat_app,
-        "--host", "0.0.0.0",
-        "--port", str(args.compat_port),
-    ]
-    if args.reload:
-        compat_cmd.append("--reload")
-    
-    # Меняем рабочую директорию для compat proxy
-    compat_cwd = workdir / args.compat_cwd
-    logger.info("Compat рабочая директория: %s", compat_cwd)
-    
     # Создаём процессы
     proxy_process = create_process("proxy", proxy_cmd, env=proxy_env, logger=logger)
-    compat_process = create_process("compat", compat_cmd, env=compat_env, cwd=compat_cwd, logger=logger)
     
     # Создаём процесс dashboard если запрошено
     dashboard_process = None
@@ -279,7 +226,6 @@ def main():
     
     logger.info("Процессы запущены:")
     logger.info("  - proxy: PID %s на порту %s", proxy_process.pid, args.proxy_port)
-    logger.info("  - compat: PID %s на порту %s (UPSTREAM_URL=%s)", compat_process.pid, args.compat_port, upstream_url)
     if dashboard_process:
         logger.info("  - dashboard: PID %s на порту %s", dashboard_process.pid, args.dashboard_port)
     logger.info("Нажмите Ctrl+C для остановки")
@@ -293,15 +239,9 @@ def main():
         daemon=True,
         name="proxy-output"
     )
-    compat_thread = threading.Thread(
-        target=stream_output,
-        args=(compat_process, "compat", logger, True),  # Выводить на консоль
-        daemon=True,
-        name="compat-output"
-    )
+    
     
     proxy_thread.start()
-    compat_thread.start()
     
     if dashboard_process:
         dashboard_thread = threading.Thread(
@@ -317,10 +257,9 @@ def main():
         while True:
             # Проверяем, живы ли процессы
             proxy_alive = proxy_process.poll() is None
-            compat_alive = compat_process.poll() is None
             dashboard_alive = dashboard_process is None or dashboard_process.poll() is None
             
-            if not proxy_alive and not compat_alive and not dashboard_alive:
+            if not proxy_alive and not dashboard_alive:
                 logger.info("Все процессы завершились")
                 break
             
@@ -335,7 +274,6 @@ def main():
     finally:
         # Потоки закроются автоматически (daemon=True)
         proxy_thread.join(timeout=0.1)
-        compat_thread.join(timeout=0.1)
         if dashboard_thread:
             dashboard_thread.join(timeout=0.1)
 

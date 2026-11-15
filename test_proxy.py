@@ -316,7 +316,7 @@ async def proxy(request: Request):
         resp = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True))
         
         if resp.status_code != 200:
-            json_ = json.loads(resp.content)
+            json_ = resp.json()
             mess = json_.get('message', 'None')
             if mess == 'None':
                 mess = json_.get('error', 'None')
@@ -340,6 +340,24 @@ async def proxy(request: Request):
                     status_code=resp.status_code
                 )
         if resp.status_code == 200:
+            if payload.get('stream') == False:
+                json_ = json.loads(resp.content.decode())
+                mess = json_.get('message', 'None')
+                if mess != 'None':
+                    if 'заблокирован' in mess:
+                        print(f"[banned] Аккаунт {current_account_id} ({current_acc_index + 1}) заблокирован ({mess}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
+                        if attempt < len(ACCOUNTS) - 1:
+                            switch_account()
+                            current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
+                            continue
+                        else:
+                            print(f"[retry] Все аккаунты исчерпаны, возвращаем {resp.status_code} клиенту")
+                            if DEBUG_MODE:
+                                print(f"[proxy] Response: {resp.status_code} (все аккаунты исчерпаны)", flush=True)
+                            return Response(
+                                content=json.dumps({"error": "rate_limit_exceeded", "detail": f"Все аккаунты вернули {resp.status_code}"}),
+                                status_code=resp.status_code
+                            )
             if DEBUG_MODE:
                 print(f"[proxy] Response: 200 OK (аккаунт {current_acc_index + 1})", flush=True)
             break  # Нормальный ответ — выходим из цикла
