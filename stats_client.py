@@ -360,11 +360,54 @@ def init_accounts(account_ids: list[str]):
         if cursor.fetchone() is None:
             # Добавляем новый аккаунт с нулевым счётчиком
             cursor.execute(
-                """INSERT INTO account_stats 
+                """INSERT OR IGNORE INTO account_stats 
                    (account_id, request_count, first_request_at, last_request_at, last_429_at)
                    VALUES (?, 0, NULL, NULL, NULL)""",
                 (account_id,)
             )
     
     conn.commit()
+    conn.close()
+
+
+def sync_accounts(account_ids: list[str]):
+    """
+    Синхронизировать БД с актуальным списком аккаунтов.
+    Удаляет из БД аккаунты, которых нет в accaunts.py.
+    
+    Args:
+        account_ids: Список ID аккаунтов из accaunts.py (актуальный список)
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Получить все account_id из БД
+    cursor.execute("SELECT account_id FROM account_stats")
+    db_accounts = {row[0] for row in cursor.fetchall()}
+    
+    # Преобразовать список в множество для быстрого сравнения
+    actual_accounts = set(account_ids)
+    
+    # Найти аккаунты для удаления (есть в БД, но нет в accaunts.py)
+    to_remove = db_accounts - actual_accounts
+    
+    if to_remove:
+        # Удалить из account_stats
+        placeholders = ",".join("?" * len(to_remove))
+        cursor.execute(
+            f"DELETE FROM account_stats WHERE account_id IN ({placeholders})",
+            list(to_remove)
+        )
+        
+        # Удалить из request_log
+        cursor.execute(
+            f"DELETE FROM request_log WHERE account_id IN ({placeholders})",
+            list(to_remove)
+        )
+        
+        conn.commit()
+        print(f"[stats] Синхронизация: удалено {len(to_remove)} аккаунтов: {to_remove}")
+    else:
+        print("[stats] Синхронизация: все аккаунты актуальны")
+    
     conn.close()

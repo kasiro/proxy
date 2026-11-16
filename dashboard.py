@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import uvicorn
 
-from stats_client import init_db, record_request_async, get_all_stats, init_accounts, get_recent_requests, check_daily_reset
+from stats_client import init_db, record_request_async, get_all_stats, init_accounts, sync_accounts, get_recent_requests, check_daily_reset
 from accaunts import ACCOUNTS
 from utils import extract_account_ids_from_accounts
 
@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
     init_db()
     ACCOUNT_IDS = extract_account_ids_from_accounts(ACCOUNTS)
     init_accounts(ACCOUNT_IDS)
+    sync_accounts(ACCOUNT_IDS)
     check_daily_reset()
     yield
 
