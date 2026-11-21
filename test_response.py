@@ -22,13 +22,13 @@ def dd(data):
 # else:
 print('-- port 5000 --')
 data = rq.post('http://localhost:5000/v1/chat/completions', headers = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
 }, json={
   "model": "free-qwen3.5-plus",
   "messages": [
     {"role": "user", "content": "Привет"}
   ],
-  "stream": False
+  "stream": True
 })
 print(data)
 dd(data.content.decode())

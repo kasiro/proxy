@@ -7,8 +7,10 @@ from urllib.parse import urlparse
 from sseclient import SSEClient # type: ignore
 from pprint import pprint
 import requests as rq
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from fastapi import FastAPI, Request, Response # type: ignore
-from fastapi.responses import StreamingResponse # type: ignore
+from fastapi.responses import StreamingResponse, JSONResponse # type: ignore
 import threading
 import asyncio
 from accaunts import ACCOUNTS
@@ -24,6 +26,20 @@ try:
 except ImportError:
     STATS_ENABLED = False
     print("[stats] Модуль stats_client не найден, статистика отключена")
+
+class BanDetectedException(Exception):
+    """Исключение для сигнала о бане аккаунта."""
+    pass
+
+
+def check_account_ban(final_response: dict) -> bool:
+    """Проверяет бан по message в final_response."""
+    message = final_response.get('choices', [{}])[0].get('message', '')
+    if isinstance(message, str) and 'заблокирован' in message:
+        print(f"[ban_check] Account blocked: message='{message[:100]}'")
+        raise BanDetectedException(f"Account '{get_current_account_id()}' is banned")
+    return False
+
 
 # добавить tools, mcp, skills
 
@@ -113,6 +129,11 @@ session.headers.update(all_['headers'])
 session.cookies.update(all_['cookies'])
 session.trust_env = False  # Игнорировать HTTP_PROXY/HTTPS_PROXY и системные настройки
 session.proxies.clear()  # Явно очистить любые прокси
+
+# Retry-политика для транспортных сбоев (502/503/504 и обрывы соединения)
+_adapter = HTTPAdapter(max_retries=Retry(total=2, backoff_factor=0.5, status_forcelist=[502, 503, 504]))
+session.mount('http://', _adapter)
+session.mount('https://', _adapter)
 
 # Инициализация БД статистики при старте
 if STATS_ENABLED:
@@ -265,8 +286,28 @@ def not_is_None(obj) -> bool:
 
 @app.post('/v1/chat/completions')
 async def proxy(request: Request):
+    global current_acc_index, TARGET_URL
     # start:
     client_data = await request.json()
+    
+    # --- Поддержка выбора аккаунта по заголовку X-Test-Account-ID ---
+    account_id_from_header = request.headers.get('x-test-account-id')
+    is_test_request = bool(account_id_from_header)
+    if account_id_from_header:
+        if account_id_from_header in ACCOUNT_IDS:
+            target_index = ACCOUNT_IDS.index(account_id_from_header)
+            current_acc_index = target_index
+            print(f"[proxy] Выбран аккаунт по заголовку: {account_id_from_header} (index {current_acc_index + 1}/{len(ACCOUNT_IDS)})")
+            # Обновить session для выбранного аккаунта
+            parsed = curl_to_python(ACCOUNTS[current_acc_index])
+            TARGET_URL = parsed['url']
+            session.headers.clear()
+            session.cookies.clear()
+            session.headers.update(parsed['headers'])
+            session.cookies.update(parsed['cookies'])
+        else:
+            print(f"[proxy] Валидный заголовок X-Test-Account-ID: '{account_id_from_header}' не найден в ACCOUNT_IDS")
+    
     # Можно принимать от клиента messages, остальное подставляем
     payload = {
         "group": client_data.get("group", "default"),
@@ -313,50 +354,64 @@ async def proxy(request: Request):
     current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
 
     for attempt in range(len(ACCOUNTS)):
-        resp = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True))
+        resp = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True), timeout=180)
         
         if resp.status_code != 200:
             json_ = resp.json()
             mess = json_.get('message', 'None')
             if mess == 'None':
                 mess = json_.get('error', 'None')
+            
+            # Обработка [429, 401] как "аккаунт исчерпан/требует реавторизации"
+            if resp.status_code in [429, 401]:
+                code_name = "429 Too Many Requests" if resp.status_code == 429 else "401 Unauthorized"
+                print(f"[retry] Аккаунт {current_account_id} ({current_acc_index + 1}) вернул {resp.status_code} ({code_name}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
+                if DEBUG_MODE:
+                    print(f"[proxy] Response: {resp.status_code} (аккаунт {current_acc_index + 1})", flush=True)
+                # Запись 429/401 в статистику
+                if STATS_ENABLED:
+                    await record_request_async(account_id, resp.status_code, model, input_tokens, output_tokens)  # type: ignore
+                
+                if attempt < len(ACCOUNTS) - 1 and not is_test_request:
+                    switch_account()
+                    current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
+                    continue
+                else:
+                    print(f"[retry] Все аккаунты исчерпаны / тестовый режим, возвращаем {resp.status_code} клиенту")
+                    if DEBUG_MODE:
+                        print(f"[proxy] Response: {resp.status_code} (все аккаунты исчерпаны / тестовый режим)", flush=True)
+                    return Response(
+                        content=json.dumps({"error": "rate_limit_exceeded" if resp.status_code == 429 else "unauthorized", "detail": f"Все аккаунты вернули {resp.status_code}"}),
+                        status_code=resp.status_code
+                    )
+            
+            # Остальные ошибки (не 429/401) — просто выводим и прекращаем попытки
             print(f"[retry] Аккаунт {current_account_id} ({current_acc_index + 1}) вернул {resp.status_code} ({mess}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
             if DEBUG_MODE:
                 print(f"[proxy] Response: {resp.status_code} (аккаунт {current_acc_index + 1})", flush=True)
-            # Запись 429 в статистику
             if STATS_ENABLED:
                 await record_request_async(account_id, resp.status_code, model, input_tokens, output_tokens)  # type: ignore
             
-            if attempt < len(ACCOUNTS) - 1:
-                switch_account()
-                current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
-                continue
-            else:
-                print(f"[retry] Все аккаунты исчерпаны, возвращаем {resp.status_code} клиенту")
-                if DEBUG_MODE:
-                    print(f"[proxy] Response: {resp.status_code} (все аккаунты исчерпаны)", flush=True)
-                return Response(
-                    content=json.dumps({"error": "rate_limit_exceeded", "detail": f"Все аккаунты вернули {resp.status_code}"}),
-                    status_code=resp.status_code
-                )
+            print(f"[retry] Прерываю цикл из-за статуса {resp.status_code} (не 429/401)")
+            break
         if resp.status_code == 200:
             if payload.get('stream') == False:
                 json_ = json.loads(resp.content.decode())
                 mess = json_.get('message', 'None')
                 if mess != 'None':
                     if 'заблокирован' in mess:
-                        print(f"[banned] Аккаунт {current_account_id} ({current_acc_index + 1}) заблокирован ({mess}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
-                        if attempt < len(ACCOUNTS) - 1:
+                        print(f"[banned] Аккаунт {current_account_id} ({current_acc_index + 1}) забанен. ({mess}) (попытка {attempt + 1}/{len(ACCOUNTS)})")
+                        if attempt < len(ACCOUNTS) - 1 and not is_test_request:
                             switch_account()
                             current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
                             continue
                         else:
-                            print(f"[retry] Все аккаунты исчерпаны, возвращаем {resp.status_code} клиенту")
+                            print(f"[retry] Бан найден в тестовом режиме / все аккаунты исчерпаны, возвращаем {resp.status_code} клиенту")
                             if DEBUG_MODE:
                                 print(f"[proxy] Response: {resp.status_code} (все аккаунты исчерпаны)", flush=True)
                             return Response(
-                                content=json.dumps({"error": "rate_limit_exceeded", "detail": f"Все аккаунты вернули {resp.status_code}"}),
-                                status_code=resp.status_code
+                                content=json.dumps({"error": "Account is banned", "detail": f"Аккаунт забанен"}, ensure_ascii=False),
+                                status_code=403
                             )
             if DEBUG_MODE:
                 print(f"[proxy] Response: 200 OK (аккаунт {current_acc_index + 1})", flush=True)
@@ -374,8 +429,13 @@ async def proxy(request: Request):
             )
 
 
-    if resp.status_code != 200: # type: ignore
-        # Вернуть ошибку как JSON или SSE
+    # Обработка ошибок в stream режиме — если 401 или 429, это бан
+    if resp.status_code in [429, 401]: # type: ignore
+        code_name = "rate_limit_exceeded" if resp.status_code == 429 else "unauthorized"
+        print(f"[retry] Стрим: Аккаунт {current_account_id} вернул {resp.status_code} ({code_name})")
+        raise BanDetectedException(f"Account '{get_current_account_id()}' returned {resp.status_code}") # type: ignore
+    elif resp.status_code != 200: # type: ignore
+        # Ошибка другого типа — возвращаем клиенту
         return Response(content=resp.text, status_code=resp.status_code) # type: ignore
     # print(f"Status: {resp.status_code}")
     if payload.get('stream', True):
@@ -394,31 +454,68 @@ async def proxy(request: Request):
         # Контейнер для сбора токенов из SSE
         usage_data = {'input_tokens': input_tokens, 'output_tokens': 0}
 
-        def stream_generator():
+        def collect_and_check_stream():
+            """Собирает весь SSE поток, проверяет на бан, возвращает накопленный результат."""
+            accumulator = {'choices': [], 'usage': None}
+            
             for line in resp.iter_lines(decode_unicode=False): # type: ignore
                 if line:
                     line = line.decode()
+                    
+                    # ПРОВЕРКА НА JSON С БАНOM (до проверки [DONE])
+                    if not line.startswith('data:') and line.strip():
+                        try:
+                            json_data = json.loads(line)
+                            msg = json_data.get('message', '')
+                            if isinstance(msg, str) and 'заблокирован' in msg:
+                                print(f"[banned] Запрещённый ответ от upstream (JSON): {msg}")
+                                raise BanDetectedException(f"Account '{get_current_account_id()}' is banned")
+                        except json.JSONDecodeError:
+                            pass
+                    
                     if line.strip() == 'data: [DONE]':
-                        yield line + '\n\n' # type: ignore
+                        # Проверяем аккаунт на бан после завершения потока
+                        if check_account_ban(accumulator):
+                            raise BanDetectedException(f"Account '{get_current_account_id()}' is banned after full response")
+                        
+                        yield f'data: {json.dumps({"done": True})}\n\n'
                         break
-                    # Извлечение usage из SSE
+                    
+                    # Извлечение usage и accumulation choices из SSE
                     if line.startswith('data: '):
                         # Фильтрация <think> тегов
-                        line = strip_think_from_sse_line(line)
-                        # Парсинг usage
+                        line_content = strip_think_from_sse_line(line)
+                        # Парсинг
                         try:
                             payload_str = line[6:]  # убираем 'data: '
                             if payload_str.strip() != '[DONE]':
                                 data = json.loads(payload_str)
+                                
+                                # Проверка бана в КАЖДОМ choice текущего чанка
+                                for choice in data.get('choices', []):
+                                    msg = choice.get('message', {})
+                                    content = msg.get('content')
+                                    if isinstance(content, str) and 'заблокирован' in content:
+                                        print(f"[banned] Найдено 'заблокирован' в SSE чанке: {content}")
+                                        raise BanDetectedException(f"Account '{account_id}' is banned in chunk")
+                                
+                                # Накопление choices
+                                if 'choices' in data and data['choices']:
+                                    accumulator['choices'].extend(data['choices'])
+                                
+                                # Сохраняем usage
                                 usage = data.get('usage', {})
                                 if usage:
+                                    accumulator['usage'] = usage
                                     usage_data['output_tokens'] = usage.get('completion_tokens', 0) or usage.get('output_tokens', 0)
                                     usage_data['input_tokens'] = usage.get('prompt_tokens', usage_data['input_tokens']) or usage.get('input_tokens', usage_data['input_tokens'])
+                                    
                         except (json.JSONDecodeError, ValueError):
                             pass
+                    
                     yield line + '\n\n' # type: ignore
             
-            # Запись статистики после завершения потока
+            # Запись статистики
             if STATS_ENABLED:
                 threading.Thread(
                     target=record_request,
@@ -426,11 +523,152 @@ async def proxy(request: Request):
                     daemon=True
                 ).start()
 
-        return StreamingResponse(
-            stream_generator(),
-            status_code=resp.status_code, # type: ignore
-            media_type='text/event-stream'
-        )
+        def collect_and_check_stream_with_usage(resp_obj, usage_dict):
+            """Аналогично collect_and_check_stream, но принимает usage_dict как параметр."""
+            accumulator = {'choices': [], 'usage': None}
+            
+            for line in resp_obj.iter_lines(decode_unicode=False): # type: ignore
+                if line:
+                    line = line.decode()
+                    
+                    # ПРОВЕРКА НА JSON С БАНOM (до проверки [DONE])
+                    if not line.startswith('data:') and line.strip():
+                        try:
+                            json_data = json.loads(line)
+                            msg = json_data.get('message', '')
+                            if isinstance(msg, str) and 'заблокирован' in msg:
+                                print(f"[banned] Запрещённый ответ от upstream (JSON): {msg}")
+                                raise BanDetectedException(f"Account '{get_current_account_id()}' is banned")
+                        except json.JSONDecodeError:
+                            pass
+                    
+                    if line.strip() == 'data: [DONE]':
+                        # Проверяем аккаунт на бан после завершения потока
+                        if check_account_ban(accumulator):
+                            raise BanDetectedException(f"Account '{get_current_account_id()}' is banned after full response")
+                        
+                        yield f'data: {json.dumps({"done": True})}\n\n'
+                        break
+                    
+                    # Извлечение usage и accumulation choices из SSE
+                    if line.startswith('data: '):
+                        # Фильтрация <think> тегов
+                        line_content = strip_think_from_sse_line(line)
+                        # Парсинг
+                        try:
+                            payload_str = line[6:]  # убираем 'data: '
+                            if payload_str.strip() != '[DONE]':
+                                data = json.loads(payload_str)
+                                
+                                # Проверка бана в КАЖДОМ choice текущего чанка
+                                for choice in data.get('choices', []):
+                                    msg = choice.get('message', {})
+                                    content = msg.get('content')
+                                    if isinstance(content, str) and 'заблокирован' in content:
+                                        print(f"[banned] Найдено 'заблокирован' в SSE чанке: {content}")
+                                        raise BanDetectedException(f"Account '{account_id}' is banned in chunk")
+                                
+                                # Накопление choices
+                                if 'choices' in data and data['choices']:
+                                    accumulator['choices'].extend(data['choices'])
+                                
+                                # Сохраняем usage
+                                usage = data.get('usage', {})
+                                if usage:
+                                    accumulator['usage'] = usage
+                                    usage_dict['output_tokens'] = usage.get('completion_tokens', 0) or usage.get('output_tokens', 0)
+                                    usage_dict['input_tokens'] = usage.get('prompt_tokens', usage_dict['input_tokens']) or usage.get('input_tokens', usage_dict['input_tokens'])
+                                    
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                    
+                    yield line + '\n\n' # type: ignore
+            
+            # Запись статистики
+            if STATS_ENABLED:
+                threading.Thread(
+                    target=record_request,
+                    args=(account_id, 200, model, usage_dict['input_tokens'], usage_dict['output_tokens']),
+                    daemon=True
+                ).start()
+
+        # Сборка ВСЕХ чанков ПЕРЕД возвратом StreamingResponse
+        chunks = []
+        try:
+            # Сначала полностью собираем поток в память
+            for chunk in collect_and_check_stream():
+                chunks.append(chunk)
+            
+            # Если дошли сюда — бана не было, отдаём накопленное как iterator
+            return StreamingResponse(
+                iter(chunks),
+                status_code=resp.status_code, # type: ignore
+                media_type='text/event-stream'
+            )
+        except BanDetectedException as e:
+            if is_test_request:
+                print(f"[retry] Бан детектирован (тестовый режим), аккаунт не переключается: {e}")
+            else:
+                print(f"[retry] Бан детектирован: {e}. Переключаем аккаунт...")
+                switch_account()
+                current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
+                
+                # Retry loop для stream-ответов
+                for retry_attempt in range(len(ACCOUNTS) - 1):
+                    print(f"[retry] Retry #{retry_attempt + 1}/{len(ACCOUNTS) - 1} после бана")
+                    
+                    resp_retry = session.post(TARGET_URL, json=payload, stream=payload.get('stream', True), timeout=180)
+                    
+                    if resp_retry.status_code != 200:
+                        print(f"[retry] Аккаунт {current_account_id} вернул {resp_retry.status_code}, пробуем следующий")
+                        if retry_attempt < len(ACCOUNTS) - 2:
+                            switch_account()
+                            current_account_id = 'account_' + ACCOUNT_IDS[current_acc_index]
+                            continue
+                        else:
+                            print("[retry] Все аккаунты исчерпаны после бана")
+                            break
+                    
+                    # Второй проход сборки потока
+                    try:
+                        usage_data_retry = {'input_tokens': input_tokens, 'output_tokens': 0}
+                        chunks_retry = []
+                        
+                        # Сначала полностью собираем поток в память
+                        for chunk in collect_and_check_stream_with_usage(resp_retry, usage_data_retry):
+                            chunks_retry.append(chunk)
+                        
+                        return StreamingResponse(
+                            iter(chunks_retry),
+                            status_code=resp_retry.status_code,
+                            media_type='text/event-stream'
+                        )
+                    except BanDetectedException as e2:
+                        print(f"[retry] Бан снова в аккаунте {current_account_id}: {e2}")
+                        if retry_attempt < len(ACCOUNTS) - 2:
+                            switch_account()
+                            continue
+                        else:
+                            print("[retry] Все аккаунты забанены")
+                
+            # Возвращаем ошибку клиенту если все аккаунты исчерпаны / тестовый режим
+            if payload.get('stream', True):
+                err_body = (
+                    'data: ' + json.dumps(
+                        {"error": "All accounts are banned", "detail": str(e)},
+                        ensure_ascii=False
+                    ) + '\n\n' + 'data: [DONE]\n\n'
+                )
+                return Response(
+                    content=err_body,
+                    status_code=403,
+                    media_type='text/event-stream'
+                )
+            else:
+                return JSONResponse(
+                    {"error": "All accounts are banned", "detail": str(e)},
+                    status_code=403
+                )
     else:
         # Если стриминг выключен – возвращаем обычный JSON, но преобразуем
         raw_response = resp.text # type: ignore
