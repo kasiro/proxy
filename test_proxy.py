@@ -34,7 +34,10 @@ class BanDetectedException(Exception):
 
 def check_account_ban(final_response: dict) -> bool:
     """Проверяет бан по message в final_response."""
-    message = final_response.get('choices', [{}])[0].get('message', '')
+    choices = final_response.get('choices') or []
+    if not choices:
+        return False
+    message = choices[0].get('message', '')
     if isinstance(message, str) and 'заблокирован' in message:
         print(f"[ban_check] Account blocked: message='{message[:100]}'")
         raise BanDetectedException(f"Account '{get_current_account_id()}' is banned")
@@ -396,7 +399,11 @@ async def proxy(request: Request):
             break
         if resp.status_code == 200:
             if payload.get('stream') == False:
-                json_ = json.loads(resp.content.decode())
+                try:
+                    json_ = json.loads(resp.content.decode())
+                except (json.JSONDecodeError, ValueError):
+                    print(f"[proxy] Не-JSON тело upstream ({resp.status_code})")
+                    return Response(content=resp.content, status_code=resp.status_code)
                 mess = json_.get('message', 'None')
                 if mess != 'None':
                     if 'заблокирован' in mess:
@@ -484,7 +491,7 @@ async def proxy(request: Request):
                     # Извлечение usage и accumulation choices из SSE
                     if line.startswith('data: '):
                         # Фильтрация <think> тегов
-                        line_content = strip_think_from_sse_line(line)
+                        line = strip_think_from_sse_line(line)
                         # Парсинг
                         try:
                             payload_str = line[6:]  # убираем 'data: '
@@ -553,7 +560,7 @@ async def proxy(request: Request):
                     # Извлечение usage и accumulation choices из SSE
                     if line.startswith('data: '):
                         # Фильтрация <think> тегов
-                        line_content = strip_think_from_sse_line(line)
+                        line = strip_think_from_sse_line(line)
                         # Парсинг
                         try:
                             payload_str = line[6:]  # убираем 'data: '
@@ -696,13 +703,17 @@ async def proxy(request: Request):
             content = strip_think_tags(content)
             message['content'] = content
             # Попробуем найти JSON внутри текста (например, {"tool_calls": ...})
-            match = re.search(r'(\{"tool_calls":\s*\[.*?\])', content, re.DOTALL)
+            match = re.search(r'(\{"tool_calls":\s*\[.*\]\})', content, re.DOTALL)
             if match:
                 tool_call_json = match.group(1)
                 # Заменяем content на этот JSON и добавляем tool_calls в message
                 new_message = message.copy()
                 new_message['content'] = None  # или убираем
-                new_message['tool_calls'] = json.loads(tool_call_json)['tool_calls']
+                try:
+                    new_message['tool_calls'] = json.loads(tool_call_json)['tool_calls']
+                except (json.JSONDecodeError, ValueError):
+                    # Неполный захват JSON — возвращаем исходный ответ без преобразования
+                    return Response(content=raw_response, status_code=resp.status_code) # type: ignore
                 data['choices'][0]['message'] = new_message
                 return Response(content=json.dumps(data), status_code=resp.status_code) # type: ignore
         # Если ничего не нашли, возвращаем как есть

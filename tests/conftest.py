@@ -2,6 +2,11 @@
 
 Ключевая идея: путь к SQLite-БД статистики подменяется на временный
 ДО импорта test_proxy/dashboard, чтобы тесты не трогали stats.db проекта.
+
+Фикстура tmp_db сделана session-scoped (а не function-scoped с monkeypatch),
+потому что фикстуры proxy/dashboard, импортирующие модули после подмены пути,
+тоже session-scoped. Изоляция между тестами обеспечивается autouse-фикстурой
+clean_stats_db, очищающей обе таблицы перед каждым тестом.
 """
 import sqlite3
 import sys

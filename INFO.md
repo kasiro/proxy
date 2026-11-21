@@ -33,6 +33,14 @@ Reverse-proxy для OpenRouter-подобного API (odirouter.ai) с пул�
 5. `pgrep` заблокирован bash-фильтром `*grep*` → использовать `ps | rg`.
 6. dashboard: старый uvicorn-процесс может висеть «зомби» и не отдавать порт, SIGTERM не берёт → `kill -9` по PID.
 
+## Production-баги (найдены при покрытии тестами, 2026-11-22) — [x] все 4 починены 2026-11-22
+1. [x] **Фильтр think-тегов в stream мёртв** — `strip_think_from_sse_line(line)` вызывается (test_proxy.py стр. ~487/556), но результат отбрасывается: yield идёт по оригиналу `line`.
+2. [x] **Не-JSON тело upstream роняет запрос** — `json.loads(resp.content)` (стр. ~399) без try/except; ветка `except JSONDecodeError` (стр. ~682-683) недостижима.
+3. [x] **Regex tool_calls не захватывает `}`** (стр. ~699) → `json.loads` падает → 500 (стр. ~706-707 недостижимы).
+4. [x] **`check_account_ban` на пустом `choices` → IndexError** вместо False (стр. ~37).
+
+Статус: [x] починены все 4 (py_compile чистый, 101 passed). Regex tool_calls: паттерн `.*\]\}` + try/except — извлечение tool_calls из текста работает.
+
 ## Совместимость SSE-ошибок (уточнение на 2026-11-22)
 
 Пункты 1–2 выше устарели: формат ответа при бане в `stream=true` изменён на SSE.
